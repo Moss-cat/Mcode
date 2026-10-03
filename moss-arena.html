@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MOSS 竞技场 — 囚徒困境博弈</title>
+<style>
+  :root {
+    --bg-0: #0a0e14;
+    --bg-1: #0f1620;
+    --bg-2: #131c28;
+    --line: #1f2a37;
+    --text: #e6edf3;
+    --muted: #7d8b9a;
+    --keyword: #ff7b72;
+    --func: #d2a8ff;
+    --str: #a5d6ff;
+    --tag: #7ee787;
+    --num: #f2cc60;
+    --accent: #58a6ff;
+    --accent-2: #7ee787;
+    --danger: #f85149;
+    --warn: #d29922;
+    --shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: var(--text);
+    background: radial-gradient(1200px 800px at 20% -10%, #16223a 0%, transparent 60%),
+      radial-gradient(900px 700px at 110% 110%, #1a2b1e 0%, transparent 55%),
+      linear-gradient(180deg, var(--bg-0), var(--bg-1));
+    overflow-x: hidden;
+  }
+  .mono { font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace; }
+  .grid-bg {
+    position: fixed; inset: 0;
+    background-image: linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 44px 44px;
+    opacity: 0.18;
+    mask-image: radial-gradient(circle at 50% 40%, #000 0%, transparent 75%);
+    pointer-events: none; z-index: 0;
+  }
+  header {
+    position: fixed; top: 0; left: 0; right: 0; height: 60px;
+    display: flex; align-items: center; padding: 0 28px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(10, 14, 20, 0.72); backdrop-filter: blur(12px); z-index: 10;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 0;
+    font-size: 17px; font-weight: 600; letter-spacing: 0.2px; cursor: pointer;
+  }
+  .brand .hash { color: var(--num); }
+  .brand .bracket-l { color: var(--accent); }
+  .brand .slash { color: var(--muted); }
+  .brand .bracket-r { color: var(--accent); }
+  .brand .cn { color: var(--text); margin: 0 2px; }
+  .brand .suffix { color: var(--tag); }
+  .dot {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--accent-2);
+    box-shadow: 0 0 12px var(--accent-2); animation: pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.85); } }
+  .header-right {
+    margin-left: auto; display: flex; align-items: center; gap: 14px;
+    color: var(--muted); font-size: 13px;
+  }
+  .header-right .badge {
+    padding: 3px 10px; border-radius: 20px; font-size: 11.5px;
+    background: rgba(126, 231, 135, 0.1); color: var(--tag);
+    border: 1px solid rgba(126, 231, 135, 0.3);
+  }
+  main {
+    min-height: 100%; padding: 76px 20px 28px; position: relative; z-index: 1;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(420px, 1fr) minmax(420px, 1fr);
+    gap: 18px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: linear-gradient(180deg, rgba(19, 28, 40, 0.92), rgba(15, 22, 32, 0.92));
+    border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow); overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .panel-top {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px; border-bottom: 1px solid var(--line);
+    background: rgba(0, 0, 0, 0.25);
+  }
+  .win-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot-red { background: #ff5f57; }
+  .dot-yel { background: #febc2e; }
+  .dot-grn { background: #28c840; }
+  .panel-title {
+    margin-left: 6px; color: var(--muted); font-size: 12.5px; letter-spacing: 0.3px;
+  }
+  .panel-body { padding: 16px; flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+  /* 代码编辑器 */
+  .editor-toolbar {
+    display: flex; gap: 10px; align-items: center; margin-bottom: 12px;
+  }
+  .select {
+    background: var(--bg-2); border: 1px solid var(--line); color: var(--text);
+    padding: 8px 12px; border-radius: 8px; font-size: 13px; font-family: inherit;
+    outline: none; cursor: pointer; transition: border-color 0.18s;
+  }
+  .select:focus { border-color: var(--accent); }
+  .input-num {
+    background: var(--bg-2); border: 1px solid var(--line); color: var(--text);
+    padding: 8px 10px; border-radius: 8px; font-size: 13px; width: 80px;
+    font-family: inherit; outline: none; text-align: center;
+  }
+  .input-num:focus { border-color: var(--accent); }
+  .btn {
+    background: var(--bg-2); border: 1px solid var(--line); color: var(--accent);
+    padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer;
+    font-family: inherit; transition: all 0.18s; white-space: nowrap;
+  }
+  .btn:hover:not(:disabled) { border-color: var(--accent); background: rgba(88, 166, 255, 0.1); }
+  .btn:disabled { color: var(--muted); cursor: not-allowed; opacity: 0.5; }
+  .btn-primary {
+    background: linear-gradient(90deg, var(--accent), #3a8bff);
+    border: none; color: #fff; font-weight: 600;
+  }
+  .btn-primary:hover:not(:disabled) { filter: brightness(1.08); box-shadow: 0 6px 20px rgba(88, 166, 255, 0.35); }
+  .btn-danger { color: var(--danger); }
+  .btn-danger:hover:not(:disabled) { border-color: var(--danger); background: rgba(248, 81, 73, 0.1); }
+
+  .editor-wrap {
+    position: relative; flex: 1; min-height: 320px;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--bg-0); overflow: hidden;
+  }
+  .editor-wrap textarea {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    background: transparent; color: transparent; caret-color: var(--accent);
+    border: none; outline: none; resize: none; padding: 14px;
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+    font-size: 13.5px; line-height: 1.65; letter-spacing: 0.1px;
+    white-space: pre; overflow: auto; tab-size: 4;
+  }
+  .editor-highlight {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    padding: 14px; pointer-events: none;
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+    font-size: 13.5px; line-height: 1.65; letter-spacing: 0.1px;
+    white-space: pre; overflow: auto;
+  }
+  .editor-highlight .t-kw { color: var(--keyword); }
+  .editor-highlight .t-fn { color: var(--func); }
+  .editor-highlight .t-str { color: var(--str); }
+  .editor-highlight .t-num { color: var(--num); }
+  .editor-highlight .t-cmt { color: var(--muted); font-style: italic; }
+  .editor-highlight .t-tag { color: var(--tag); }
+
+  /* 对战面板 */
+  .config-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;
+  }
+  .field-label { font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .result-area { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+  .score-board {
+    display: grid; grid-template-columns: 1fr auto 1fr;
+    gap: 10px; padding: 12px;
+    background: var(--bg-0); border: 1px solid var(--line); border-radius: 10px;
+    margin-bottom: 12px;
+  }
+  .player { text-align: center; }
+  .player .name { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  .player .score { font-size: 26px; font-weight: 700; color: var(--accent); font-family: monospace; }
+  .player.looser .score { color: var(--danger); }
+  .player.winner .score { color: var(--accent-2); }
+  .vs {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 12px; font-weight: 600;
+    padding: 0 6px;
+  }
+  .status-line {
+    font-size: 12.5px; color: var(--muted); text-align: center;
+    margin-bottom: 10px; min-height: 18px;
+  }
+  .status-line .run-tag { color: var(--tag); }
+  .rounds-log {
+    flex: 1; overflow-y: auto; padding: 10px 12px;
+    background: var(--bg-0); border: 1px solid var(--line); border-radius: 10px;
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+    font-size: 12px; line-height: 1.7;
+  }
+  .round-line {
+    display: grid; grid-template-columns: 40px 1fr 50px 50px 1fr;
+    gap: 8px; align-items: center; padding: 1px 0;
+    border-bottom: 1px dashed rgba(31, 42, 55, 0.5);
+  }
+  .round-line .r { color: var(--muted); }
+  .round-line .coop { color: var(--tag); }
+  .round-line .def { color: var(--danger); }
+  .round-line .sc { color: var(--num); text-align: right; }
+
+  /* 控制台日志 */
+  .log-area {
+    margin-top: 12px; max-height: 120px; overflow-y: auto;
+    background: var(--bg-0); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px; font-size: 12px; font-family: monospace;
+    color: var(--muted); display: none;
+  }
+  .log-area.show { display: block; }
+  .log-area .err { color: var(--danger); }
+  .log-area .ok { color: var(--tag); }
+
+  /* 排名（多人模式） */
+  .ranking {
+    background: var(--bg-0); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px; margin-bottom: 12px; display: none;
+  }
+  .ranking.show { display: block; }
+  .ranking h3 { font-size: 13px; color: var(--muted); margin-bottom: 10px; font-weight: 500; }
+  .rank-row {
+    display: grid; grid-template-columns: 30px 1fr 70px; gap: 10px;
+    align-items: center; padding: 6px 0;
+    border-bottom: 1px dashed rgba(31, 42, 55, 0.5);
+  }
+  .rank-row:last-child { border-bottom: none; }
+  .rank-row .rk { color: var(--num); font-weight: 600; }
+  .rank-row .nm { color: var(--text); }
+  .rank-row .sc { color: var(--accent); text-align: right; font-family: monospace; font-weight: 600; }
+  .rank-row.gold .rk, .rank-row.gold .sc { color: var(--accent-2); }
+
+  /* Toast */
+  .toast {
+    position: fixed; top: 80px; left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    background: var(--bg-2); border: 1px solid var(--line); color: var(--text);
+    padding: 11px 20px; border-radius: 8px; font-size: 13.5px;
+    box-shadow: var(--shadow); z-index: 100; opacity: 0; pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: rgba(126, 231, 135, 0.5); }
+  .toast.error { border-color: rgba(248, 81, 73, 0.5); color: #ffd4d1; }
+
+  /* 模式切换 */
+  .mode-tabs {
+    display: flex; gap: 4px; margin-bottom: 12px;
+    background: var(--bg-0); padding: 3px; border-radius: 8px;
+    border: 1px solid var(--line);
+  }
+  .mode-tab {
+    flex: 1; padding: 7px; text-align: center; font-size: 12.5px;
+    border-radius: 6px; cursor: pointer; color: var(--muted);
+    transition: all 0.18s;
+  }
+  .mode-tab.active {
+    background: rgba(88, 166, 255, 0.15); color: var(--accent);
+  }
+
+  /* 多人 bot 列表 */
+  .bot-list {
+    max-height: 180px; overflow-y: auto;
+    background: var(--bg-0); border: 1px solid var(--line); border-radius: 10px;
+    padding: 8px; margin-bottom: 12px;
+  }
+  .bot-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px; border-radius: 6px; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .bot-item:hover { background: rgba(88, 166, 255, 0.08); }
+  .bot-item input { accent-color: var(--accent); }
+  .bot-item .nm { font-size: 13px; color: var(--text); }
+  .bot-item .desc { font-size: 11px; color: var(--muted); margin-left: auto; }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #2d3a4a; }
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<header>
+  <div class="brand" onclick="location.href='index.html'">
+    <span class="hash">#</span><span class="cn">编程有趣游戏赛事</span>
+    <span class="bracket-l">[</span><span class="slash">/</span><span class="bracket-r">]</span>
+    <span class="suffix">.moss</span>
+  </div>
+  <div class="header-right">
+    <span class="badge">MOSS Arena</span>
+    <span>囚徒困境博弈 · 1984 Axelrod 范式</span>
+  </div>
+</header>
+
+<main>
+  <div class="layout">
+    <!-- 左侧：代码编辑器 -->
+    <div class="panel">
+      <div class="panel-top">
+        <span class="win-dot dot-red"></span>
+        <span class="win-dot dot-yel"></span>
+        <span class="win-dot dot-grn"></span>
+        <span class="panel-title">moss_editor.moss · 我的 Bot</span>
+      </div>
+      <div class="panel-body">
+        <div class="editor-toolbar">
+          <select class="select" id="sampleBot">
+            <option value="">— 加载示例 Bot —</option>
+            <option value="tft">tit-for-tat（一报还一报）</option>
+            <option value="ac">always-cooperate（永远合作）</option>
+            <option value="ad">always-defect（永远背叛）</option>
+            <option value="rand">random（随机）</option>
+            <option value="grim">grim-trigger（冷酷触发）</option>
+            <option value="pavlov">pavlov（赢存输改）</option>
+          </select>
+          <button class="btn" id="clearBtn">清空</button>
+          <button class="btn" id="checkBtn">语法检查</button>
+        </div>
+        <div class="editor-wrap">
+          <pre class="editor-highlight mono" id="highlight"></pre>
+          <textarea class="mono" id="code" spellcheck="false" placeholder="# 在此编写你的 MOSS Bot 策略"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右侧：对战面板 -->
+    <div class="panel">
+      <div class="panel-top">
+        <span class="win-dot dot-red"></span>
+        <span class="win-dot dot-yel"></span>
+        <span class="win-dot dot-grn"></span>
+        <span class="panel-title">arena · 博弈竞技场</span>
+      </div>
+      <div class="panel-body">
+        <!-- 模式切换 -->
+        <div class="mode-tabs">
+          <div class="mode-tab active" data-mode="1v1">1v1 对决</div>
+          <div class="mode-tab" data-mode="rr">多人混战 (round-robin)</div>
+        </div>
+
+        <!-- 1v1 配置 -->
+        <div id="cfg-1v1">
+          <div class="config-row">
+            <div>
+              <div class="field-label">对手策略</div>
+              <select class="select" id="opponent" style="width:100%">
+                <option value="tft">tit-for-tat</option>
+                <option value="ac">always-cooperate</option>
+                <option value="ad">always-defect</option>
+                <option value="rand">random</option>
+                <option value="grim">grim-trigger</option>
+                <option value="pavlov">pavlov</option>
+              </select>
+            </div>
+            <div>
+              <div class="field-label">轮数</div>
+              <input class="input-num" id="rounds" type="number" min="1" max="2000" value="200" />
+            </div>
+          </div>
+        </div>
+
+        <!-- 多人配置 -->
+        <div id="cfg-rr" style="display:none">
+          <div class="field-label" style="margin-bottom:6px">选择参与混战的 Bot（至少 2 个）</div>
+          <div class="bot-list" id="botList"></div>
+          <div class="config-row" style="margin-bottom:0">
+            <div>
+              <div class="field-label">每对对战轮数</div>
+              <input class="input-num" id="roundsRR" type="number" min="1" max="500" value="50" />
+            </div>
+            <div></div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="runBtn" style="width:100%;margin-bottom:14px">▶ 开始对战</button>
+
+        <!-- 结果区 -->
+        <div class="result-area">
+          <!-- 1v1 比分 -->
+          <div class="score-board" id="scoreBoard" style="display:none">
+            <div class="player" id="playerA">
+              <div class="name" id="nameA">—</div>
+              <div class="score" id="scoreA">0</div>
+            </div>
+            <div class="vs">VS</div>
+            <div class="player" id="playerB">
+              <div class="name" id="nameB">—</div>
+              <div class="score" id="scoreB">0</div>
+            </div>
+          </div>
+
+          <!-- 多人排名 -->
+          <div class="ranking" id="ranking">
+            <h3>🏆 最终排名</h3>
+            <div id="rankingList"></div>
+          </div>
+
+          <div class="status-line" id="status">准备就绪。点击「开始对战」运行博弈。</div>
+
+          <div class="rounds-log mono" id="roundsLog" style="display:none">
+            <div style="color:var(--muted);margin-bottom:6px">— 每轮决策记录 —</div>
+          </div>
+
+          <div class="log-area mono" id="logArea"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="moss.js"></script>
+<script>
+// ============================================================
+//  示例 Bot 源码内嵌
+// ============================================================
+const SAMPLES = {
+  tft: `# tit-for-tat（一报还一报）
+# 第一轮合作，之后镜像对手上一轮决策
+# 1980 年 Axelrod 锦标赛冠军策略
+
+def main():
+    if len(opponent_history) == 0:
+        choose("cooperate")
+    else:
+        choose(opponent_history[-1])
+`,
+  ac: `# always-cooperate（永远合作）
+# 最善良的策略，两两合作时收益最大
+
+def main():
+    choose("cooperate")
+`,
+  ad: `# always-defect（永远背叛）
+# 最冷酷的策略，Nash 均衡点
+
+def main():
+    choose("defect")
+`,
+  rand: `# random（真随机决策）
+# 50/50 概率合作或背叛
+# 使用内置 random() / randint(a, b) 函数
+
+def main():
+    r = randint(0, 1)
+    if r == 0:
+        choose("cooperate")
+    else:
+        choose("defect")
+`,
+  grim: `# grim-trigger（冷酷触发）
+# 永远合作，直到对手背叛一次，之后永远背叛
+
+def was_betrayed():
+    for choice in opponent_history:
+        if choice == "defect":
+            return True
+    return False
+
+def main():
+    if was_betrayed():
+        choose("defect")
+    else:
+        choose("cooperate")
+`,
+  pavlov: `# pavlov（赢存输改）
+# 赢了就保持上一轮选择，输了就改变
+
+def main():
+    if len(history) == 0:
+        choose("cooperate")
+    elif win:
+        choose(history[-1])
+    else:
+        if history[-1] == "cooperate":
+            choose("defect")
+        else:
+            choose("cooperate")
+`,
+};
+
+const BOT_META = [
+  { id: 'tft', name: 'tit-for-tat', desc: '一报还一报' },
+  { id: 'ac', name: 'always-cooperate', desc: '永远合作' },
+  { id: 'ad', name: 'always-defect', desc: '永远背叛' },
+  { id: 'rand', name: 'random', desc: '随机' },
+  { id: 'grim', name: 'grim-trigger', desc: '冷酷触发' },
+  { id: 'pavlov', name: 'pavlov', desc: '赢存输改' },
+];
+
+// ============================================================
+//  DOM 引用
+// ============================================================
+const codeEl = document.getElementById('code');
+const hlEl = document.getElementById('highlight');
+const sampleEl = document.getElementById('sampleBot');
+const clearBtn = document.getElementById('clearBtn');
+const checkBtn = document.getElementById('checkBtn');
+const runBtn = document.getElementById('runBtn');
+const oppEl = document.getElementById('opponent');
+const roundsEl = document.getElementById('rounds');
+const roundsRREl = document.getElementById('roundsRR');
+const scoreBoard = document.getElementById('scoreBoard');
+const nameA = document.getElementById('nameA');
+const nameB = document.getElementById('nameB');
+const scoreA = document.getElementById('scoreA');
+const scoreB = document.getElementById('scoreB');
+const playerA = document.getElementById('playerA');
+const playerB = document.getElementById('playerB');
+const statusEl = document.getElementById('status');
+const roundsLog = document.getElementById('roundsLog');
+const logArea = document.getElementById('logArea');
+const ranking = document.getElementById('ranking');
+const rankingList = document.getElementById('rankingList');
+const toast = document.getElementById('toast');
+const botList = document.getElementById('botList');
+const cfg1v1 = document.getElementById('cfg-1v1');
+const cfgRR = document.getElementById('cfg-rr');
+
+let currentMode = '1v1';
+
+// ============================================================
+//  语法高亮
+// ============================================================
+const KEYWORDS = new Set(['if','elif','else','while','for','def','return','True','False','None','in','not','and','or','pass','break','continue','is']);
+const BUILTINS = new Set(['len','range','print','str','int','float','bool','list','dict','tuple','abs','min','max','sum','sorted','enumerate','zip','rround','random','randint','choice','main','choose','delay']);
+
+function highlight(src) {
+  let out = '';
+  let i = 0;
+  while (i < src.length) {
+    const ch = src[i];
+
+    // 注释
+    if (ch === '#') {
+      let j = i;
+      while (j < src.length && src[j] !== '\n') j++;
+      out += `<span class="t-cmt">${escapeHtml(src.slice(i, j))}</span>`;
+      i = j;
+      continue;
+    }
+
+    // 字符串
+    if (ch === '"' || ch === "'") {
+      const quote = ch;
+      let j = i + 1;
+      while (j < src.length && src[j] !== quote) {
+        if (src[j] === '\\') j++;
+        j++;
+      }
+      j = Math.min(j + 1, src.length);
+      out += `<span class="t-str">${escapeHtml(src.slice(i, j))}</span>`;
+      i = j;
+      continue;
+    }
+
+    // 数字
+    if (/[0-9]/.test(ch)) {
+      let j = i;
+      while (j < src.length && /[0-9_.]/.test(src[j])) j++;
+      out += `<span class="t-num">${escapeHtml(src.slice(i, j))}</span>`;
+      i = j;
+      continue;
+    }
+
+    // 标识符
+    if (/[a-zA-Z_]/.test(ch)) {
+      let j = i;
+      while (j < src.length && /[a-zA-Z0-9_]/.test(src[j])) j++;
+      const word = src.slice(i, j);
+      // 检测是否函数调用
+      let nextNonSpace = j;
+      while (nextNonSpace < src.length && (src[nextNonSpace] === ' ' || src[nextNonSpace] === '\t')) nextNonSpace++;
+      const isCall = src[nextNonSpace] === '(';
+      if (KEYWORDS.has(word)) {
+        out += `<span class="t-kw">${word}</span>`;
+      } else if (BUILTINS.has(word) || isCall) {
+        out += `<span class="t-fn">${word}</span>`;
+      } else {
+        out += word;
+      }
+      i = j;
+      continue;
+    }
+
+    out += escapeHtml(ch);
+    i++;
+  }
+  return out;
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function updateHighlight() {
+  const code = codeEl.value;
+  hlEl.innerHTML = highlight(code);
+  // 同步滚动
+  hlEl.scrollTop = codeEl.scrollTop;
+  hlEl.scrollLeft = codeEl.scrollLeft;
+}
+
+// ============================================================
+//  编辑器同步
+// ============================================================
+codeEl.addEventListener('input', updateHighlight);
+codeEl.addEventListener('scroll', () => {
+  hlEl.scrollTop = codeEl.scrollTop;
+  hlEl.scrollLeft = codeEl.scrollLeft;
+});
+codeEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const start = codeEl.selectionStart;
+    const end = codeEl.selectionEnd;
+    codeEl.value = codeEl.value.slice(0, start) + '    ' + codeEl.value.slice(end);
+    codeEl.selectionStart = codeEl.selectionEnd = start + 4;
+    updateHighlight();
+  }
+});
+
+// ============================================================
+//  示例加载
+// ============================================================
+sampleEl.addEventListener('change', () => {
+  const v = sampleEl.value;
+  if (v && SAMPLES[v]) {
+    codeEl.value = SAMPLES[v];
+    updateHighlight();
+    showToast(`已加载 ${BOT_META.find(b => b.id === v).name}`, 'success');
+  }
+  sampleEl.value = '';
+});
+
+clearBtn.addEventListener('click', () => {
+  codeEl.value = '';
+  updateHighlight();
+});
+
+// ============================================================
+//  模式切换
+// ============================================================
+document.querySelectorAll('.mode-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentMode = tab.dataset.mode;
+    if (currentMode === '1v1') {
+      cfg1v1.style.display = '';
+      cfgRR.style.display = 'none';
+      scoreBoard.style.display = '';
+      ranking.classList.remove('show');
+    } else {
+      cfg1v1.style.display = 'none';
+      cfgRR.style.display = '';
+      scoreBoard.style.display = 'none';
+      ranking.classList.remove('show');
+    }
+    resetResults();
+  });
+});
+
+// 渲染多人 bot 列表
+function renderBotList() {
+  botList.innerHTML = BOT_META.map((b, i) => `
+    <label class="bot-item">
+      <input type="checkbox" value="${b.id}" ${i < 3 ? 'checked' : ''} />
+      <span class="nm">${b.name}</span>
+      <span class="desc">${b.desc}</span>
+    </label>
+  `).join('');
+}
+renderBotList();
+
+// ============================================================
+//  语法检查
+// ============================================================
+checkBtn.addEventListener('click', () => {
+  const code = codeEl.value;
+  if (!code.trim()) { showToast('代码为空', 'error'); return; }
+  try {
+    const bot = new MOSS.Bot('check', code);
+    if (bot.compileError) {
+      showLog(`❌ 语法错误: ${bot.compileError}`, 'err');
+      showToast('语法错误，查看日志', 'error');
+    } else {
+      showLog(`✓ 编译通过，无语法错误`, 'ok');
+      showToast('语法检查通过 ✓', 'success');
+    }
+  } catch (e) {
+    showLog(`❌ 错误: ${e.message}`, 'err');
+    showToast('检查失败', 'error');
+  }
+});
+
+// ============================================================
+//  对战
+// ============================================================
+runBtn.addEventListener('click', () => {
+  const myCode = codeEl.value;
+  if (!myCode.trim()) { showToast('请先编写或加载 Bot 代码', 'error'); return; }
+
+  runBtn.disabled = true;
+  runBtn.textContent = '⏳ 运行中...';
+  resetResults();
+
+  setTimeout(() => {
+    try {
+      if (currentMode === '1v1') {
+        run1v1(myCode);
+      } else {
+        runRoundRobin(myCode);
+      }
+    } catch (e) {
+      showLog(`❌ 运行错误: ${e.message}`, 'err');
+      showToast('运行错误：' + e.message, 'error');
+    } finally {
+      runBtn.disabled = false;
+      runBtn.textContent = '▶ 开始对战';
+    }
+  }, 50);
+});
+
+function resetResults() {
+  scoreBoard.style.display = currentMode === '1v1' ? '' : 'none';
+  scoreA.textContent = '0';
+  scoreB.textContent = '0';
+  playerA.classList.remove('winner', 'looser');
+  playerB.classList.remove('winner', 'looser');
+  roundsLog.innerHTML = '<div style="color:var(--muted);margin-bottom:6px">— 每轮决策记录 —</div>';
+  roundsLog.style.display = 'none';
+  logArea.classList.remove('show');
+  logArea.innerHTML = '';
+  ranking.classList.remove('show');
+  statusEl.textContent = '准备就绪。点击「开始对战」运行博弈。';
+}
+
+function run1v1(myCode) {
+  const oppId = oppEl.value;
+  const oppCode = SAMPLES[oppId];
+  const oppName = BOT_META.find(b => b.id === oppId).name;
+  const rounds = Math.max(1, parseInt(roundsEl.value) || 200);
+
+  nameA.textContent = '我的 Bot';
+  nameB.textContent = oppName;
+
+  const arena = new MOSS.Arena({ rounds, mode: '1v1' });
+  const myBot = arena.addBot('我的 Bot', myCode);
+  arena.addBot(oppName, oppCode);
+
+  scoreBoard.style.display = '';
+  roundsLog.style.display = '';
+  statusEl.innerHTML = `<span class="run-tag">● 对战中...</span>`;
+
+  let roundCount = 0;
+  arena.onRound = (r) => {
+    roundCount++;
+    scoreA.textContent = r.a.total;
+    scoreB.textContent = r.b.total;
+    appendRoundLine(r);
+    if (roundCount % 10 === 0 || roundCount === rounds) {
+      statusEl.innerHTML = `<span class="run-tag">● 第 ${roundCount} / ${rounds} 轮</span>`;
+    }
+  };
+
+  const result = arena.runMatch();
+
+  // 最终着色
+  if (result.scoreA > result.scoreB) {
+    playerA.classList.add('winner');
+    playerB.classList.add('looser');
+  } else if (result.scoreB > result.scoreA) {
+    playerB.classList.add('winner');
+    playerA.classList.add('looser');
+  }
+
+  // 显示日志
+  if (myBot.logs && myBot.logs.length) {
+    showLog('【我的 Bot 日志】', 'ok');
+    myBot.logs.forEach(l => showLog(l));
+  }
+  if (myBot.error) {
+    showLog(`⚠ Bot 运行警告: ${myBot.error}`, 'err');
+  }
+
+  statusEl.innerHTML = result.winner === '我的 Bot'
+    ? `<span style="color:var(--tag)">🏆 你赢了！</span> ${result.scoreA} : ${result.scoreB}`
+    : result.winner === oppName
+      ? `<span style="color:var(--danger)">💀 你输了</span> ${result.scoreA} : ${result.scoreB}`
+      : `🤝 平局 ${result.scoreA} : ${result.scoreB}`;
+}
+
+function runRoundRobin(myCode) {
+  const checked = Array.from(botList.querySelectorAll('input:checked')).map(c => c.value);
+  if (checked.length < 2) { showToast('至少选择 2 个 Bot 参与混战', 'error'); return; }
+
+  const rounds = Math.max(1, parseInt(roundsRREl.value) || 50);
+  const arena = new MOSS.Arena({ rounds, mode: 'round-robin' });
+
+  // 加入我的 bot
+  const myBot = arena.addBot('我的 Bot', myCode);
+  // 加入选中的示例 bot
+  checked.forEach(id => {
+    const meta = BOT_META.find(b => b.id === id);
+    arena.addBot(meta.name, SAMPLES[id]);
+  });
+
+  statusEl.innerHTML = `<span class="run-tag">● 混战进行中...</span>`;
+  roundsLog.style.display = '';
+
+  let matchCount = 0;
+  const totalMatches = checked.length; // 我的 bot vs 每个对手
+  arena.onMatchEnd = (r) => {
+    matchCount++;
+    statusEl.innerHTML = `<span class="run-tag">● 对战 ${matchCount} / ${totalMatches}</span>`;
+  };
+
+  const result = arena.runRoundRobin();
+
+  // 显示排名
+  ranking.classList.add('show');
+  rankingList.innerHTML = result.ranking.map((r, i) => {
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+    return `<div class="rank-row ${i === 0 ? 'gold' : ''}">
+      <span class="rk">${medal}</span>
+      <span class="nm">${r.name}</span>
+      <span class="sc">${r.score}</span>
+    </div>`;
+  }).join('');
+
+  statusEl.innerHTML = `混战结束 · 共 ${result.matchResults.length} 场对战`;
+
+  if (myBot.logs && myBot.logs.length) {
+    showLog('【我的 Bot 日志】', 'ok');
+    myBot.logs.forEach(l => showLog(l));
+  }
+  if (myBot.error) {
+    showLog(`⚠ Bot 运行警告: ${myBot.error}`, 'err');
+  }
+}
+
+function appendRoundLine(r) {
+  const line = document.createElement('div');
+  line.className = 'round-line';
+  const aChoice = r.a.choice === 'cooperate' ? '合作' : '背叛';
+  const bChoice = r.b.choice === 'cooperate' ? '合作' : '背叛';
+  const aCls = r.a.choice === 'cooperate' ? 'coop' : 'def';
+  const bCls = r.b.choice === 'cooperate' ? 'coop' : 'def';
+  line.innerHTML = `
+    <span class="r">R${r.round}</span>
+    <span class="${aCls}">${aChoice}</span>
+    <span class="sc">+${r.a.score}</span>
+    <span class="sc">+${r.b.score}</span>
+    <span class="${bCls}" style="text-align:right">${bChoice}</span>
+  `;
+  roundsLog.appendChild(line);
+  roundsLog.scrollTop = roundsLog.scrollHeight;
+}
+
+function showLog(msg, cls) {
+  logArea.classList.add('show');
+  const div = document.createElement('div');
+  if (cls) div.className = cls;
+  div.textContent = msg;
+  logArea.appendChild(div);
+  logArea.scrollTop = logArea.scrollHeight;
+}
+
+function showToast(msg, type) {
+  toast.textContent = msg;
+  toast.className = 'toast show ' + (type || '');
+  setTimeout(() => toast.classList.remove('show'), 2200);
+}
+
+// 初始化：默认加载 tit-for-tat
+codeEl.value = SAMPLES.tft;
+updateHighlight();
+</script>
+</body>
+</html>

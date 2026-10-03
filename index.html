@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>编程有趣游戏赛事</title>
+<style>
+  :root {
+    --bg-0: #0a0e14;
+    --bg-1: #0f1620;
+    --bg-2: #131c28;
+    --line: #1f2a37;
+    --text: #e6edf3;
+    --muted: #7d8b9a;
+    --keyword: #ff7b72;
+    --func: #d2a8ff;
+    --str: #a5d6ff;
+    --tag: #7ee787;
+    --num: #f2cc60;
+    --accent: #58a6ff;
+    --accent-2: #7ee787;
+    --danger: #f85149;
+    --shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Microsoft YaHei", sans-serif;
+    color: var(--text);
+    background: radial-gradient(1200px 800px at 20% -10%, #16223a 0%, transparent 60%),
+      radial-gradient(900px 700px at 110% 110%, #1a2b1e 0%, transparent 55%),
+      linear-gradient(180deg, var(--bg-0), var(--bg-1));
+    overflow-x: hidden;
+  }
+
+  .mono {
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+  }
+
+  .grid-bg {
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 44px 44px;
+    opacity: 0.18;
+    mask-image: radial-gradient(circle at 50% 40%, #000 0%, transparent 75%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ===== 顶部 ===== */
+  header {
+    position: fixed; top: 0; left: 0; right: 0;
+    height: 60px;
+    display: flex; align-items: center;
+    padding: 0 28px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(10, 14, 20, 0.72);
+    backdrop-filter: blur(12px);
+    z-index: 10;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 0;
+    font-size: 17px; font-weight: 600; letter-spacing: 0.2px;
+    cursor: pointer;
+  }
+  .brand .hash { color: var(--num); }
+  .brand .bracket-l { color: var(--accent); }
+  .brand .slash { color: var(--muted); }
+  .brand .bracket-r { color: var(--accent); }
+  .brand .cn { color: var(--text); margin: 0 2px; }
+  .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--accent-2);
+    box-shadow: 0 0 12px var(--accent-2);
+    animation: pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+  .header-right {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 14px;
+    color: var(--muted); font-size: 13px;
+  }
+
+  /* ===== 主容器 ===== */
+  main {
+    min-height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    padding: 80px 24px 40px;
+    position: relative; z-index: 1;
+  }
+  .view {
+    width: 100%;
+    animation: fadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .hidden { display: none; }
+
+  /* ===== 卡片 ===== */
+  .card {
+    max-width: 420px;
+    margin: 0 auto;
+    background: linear-gradient(180deg, rgba(19, 28, 40, 0.92), rgba(15, 22, 32, 0.92));
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .card-top {
+    display: flex; align-items: center; gap: 7px;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(0, 0, 0, 0.2);
+  }
+  .win-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot-red { background: #ff5f57; }
+  .dot-yel { background: #febc2e; }
+  .dot-grn { background: #28c840; }
+  .card-top .title {
+    margin-left: 8px; color: var(--muted); font-size: 12.5px;
+  }
+  .card-body { padding: 30px 28px 26px; }
+
+  .label {
+    display: block; font-size: 13px;
+    color: var(--muted); margin-bottom: 8px;
+  }
+  .label .req { color: var(--keyword); }
+
+  .input {
+    width: 100%;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 14.5px;
+    outline: none;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    font-family: inherit;
+  }
+  .input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.18);
+  }
+  .field + .field { margin-top: 16px; }
+
+  .row {
+    display: flex; gap: 10px; align-items: stretch;
+  }
+  .row .input { flex: 1; }
+  .btn-sm {
+    white-space: nowrap;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--accent);
+    padding: 0 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    font-family: inherit;
+  }
+  .btn-sm:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: rgba(88, 166, 255, 0.1);
+  }
+  .btn-sm:disabled {
+    color: var(--muted); cursor: not-allowed; opacity: 0.6;
+  }
+
+  .primary-btn {
+    width: 100%;
+    margin-top: 22px;
+    padding: 12.5px;
+    background: linear-gradient(90deg, var(--accent), #3a8bff);
+    border: none; border-radius: 8px;
+    color: #fff; font-size: 15px; font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.18s ease, filter 0.18s ease;
+    font-family: inherit;
+  }
+  .primary-btn:hover {
+    filter: brightness(1.08);
+    box-shadow: 0 8px 24px rgba(88, 166, 255, 0.35);
+  }
+  .primary-btn:active { transform: translateY(1px); }
+
+  .forget-link {
+    display: block;
+    text-align: right;
+    margin-top: 4px;
+    margin-bottom: -14px;
+    font-size: 12.5px;
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: none;
+    transition: opacity 0.18s ease;
+  }
+  .forget-link:hover { opacity: 0.75; text-decoration: underline; }
+
+  .switch-row {
+    margin-top: 18px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .switch-row a {
+    color: var(--accent); cursor: pointer; text-decoration: none;
+  }
+  .switch-row a:hover { text-decoration: underline; }
+
+  /* ===== 忘记密码发送提示 ===== */
+  .sending-tip {
+    margin-top: 14px;
+    padding: 12px 14px;
+    background: rgba(126, 231, 135, 0.08);
+    border: 1px solid rgba(126, 231, 135, 0.25);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--tag);
+    line-height: 1.6;
+    display: none;
+  }
+  .sending-tip.show { display: block; animation: fadeUp 0.3s ease; }
+  .sending-tip .email-mono {
+    font-family: monospace; color: var(--str);
+  }
+
+  /* ===== Toast 提示 ===== */
+  .toast {
+    position: fixed;
+    top: 80px; left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    padding: 11px 20px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    box-shadow: var(--shadow);
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: rgba(126, 231, 135, 0.5); }
+  .toast.error { border-color: rgba(248, 81, 73, 0.5); color: #ffd4d1; }
+
+  /* ===== 欢迎页 ===== */
+  .welcome { max-width: 720px; margin: 0 auto; text-align: center; }
+  .time-block { margin-bottom: 24px; }
+  .clock {
+    font-size: 52px; font-weight: 700; letter-spacing: 2px;
+    color: var(--text); line-height: 1;
+  }
+  .date { margin-top: 10px; font-size: 14px; color: var(--muted); }
+
+  .greeting-card {
+    background: linear-gradient(180deg, rgba(19, 28, 40, 0.85), rgba(15, 22, 32, 0.85));
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 36px 30px;
+    box-shadow: var(--shadow);
+    position: relative; overflow: hidden;
+  }
+  .greeting-card::before {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(400px 200px at 50% 0%, rgba(88, 166, 255, 0.14), transparent 70%);
+    pointer-events: none;
+  }
+  .greeting { font-size: 34px; font-weight: 700; letter-spacing: 1px; position: relative; }
+  .greeting .salute { color: var(--str); }
+  .greeting .name { color: var(--accent-2); }
+  .sub { margin-top: 12px; font-size: 14px; color: var(--muted); line-height: 1.7; position: relative; }
+
+  .code-line {
+    margin-top: 20px;
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px;
+    padding: 8px 14px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    position: relative;
+  }
+  .code-line .var { color: var(--func); }
+  .code-line .eq { color: var(--muted); }
+  .code-line .val { color: var(--str); }
+  .cursor {
+    display: inline-block; width: 8px; height: 16px;
+    background: var(--accent-2); margin-left: 2px;
+    animation: blink 1s steps(1) infinite; vertical-align: middle;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .back-btn {
+    margin-top: 22px;
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    padding: 9px 22px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    font-family: inherit;
+  }
+  .back-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ===== 账号列表 ===== */
+  .users-section {
+    margin-top: 32px;
+    text-align: left;
+  }
+  .users-title {
+    font-size: 14px; color: var(--muted);
+    margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .users-title .count {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--accent-2);
+    padding: 1px 9px;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+  .users-list {
+    background: rgba(19, 28, 40, 0.6);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .user-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 13px 18px;
+    border-bottom: 1px solid var(--line);
+    transition: background 0.15s ease;
+  }
+  .user-row:last-child { border-bottom: none; }
+  .user-row:hover { background: rgba(88, 166, 255, 0.05); }
+  .avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--func));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 700; color: #fff;
+    flex-shrink: 0;
+  }
+  .user-info { flex: 1; min-width: 0; }
+  .user-name { font-size: 14.5px; font-weight: 600; color: var(--text); }
+  .user-email { font-size: 12px; color: var(--muted); margin-top: 2px; font-family: monospace; }
+  .user-time { font-size: 11.5px; color: var(--muted); opacity: 0.7; white-space: nowrap; }
+
+  @media (max-width: 520px) {
+    .clock { font-size: 40px; }
+    .greeting { font-size: 26px; }
+    .greeting-card { padding: 28px 18px; }
+    header { padding: 0 16px; }
+    .brand { font-size: 15px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+
+<header>
+  <div class="brand mono" onclick="goLogin()">
+    <span class="hash">#</span><span class="bracket-l">&lt;</span><span class="slash">/</span><span class="bracket-r">&gt;</span><span class="cn">编程有趣游戏赛事</span><span class="bracket-l">&lt;</span><span class="slash">/</span><span class="bracket-r">&gt;</span>
+  </div>
+  <div class="header-right" id="headerRight">
+    <span class="dot"></span>
+    <span>在线</span>
+  </div>
+</header>
+
+<main>
+  <!-- 登录页 -->
+  <section class="view" id="loginView">
+    <div class="card">
+      <div class="card-top">
+        <span class="win-dot dot-red"></span>
+        <span class="win-dot dot-yel"></span>
+        <span class="win-dot dot-grn"></span>
+        <span class="title mono">auth.py — 登录</span>
+      </div>
+      <div class="card-body">
+        <form id="loginForm" autocomplete="off">
+          <div class="field">
+            <label class="label" for="loginAccount">账号 / 邮箱 <span class="req">*</span></label>
+            <input class="input mono" id="loginAccount" type="text" placeholder="用户名或邮箱" required autofocus />
+          </div>
+          <div class="field">
+            <label class="label" for="loginPassword">密码 <span class="req">*</span></label>
+            <input class="input mono" id="loginPassword" type="password" placeholder="请输入密码" required />
+          </div>
+          <a class="forget-link" id="toForgot">Forget Password？</a>
+          <button class="primary-btn" type="submit">登 录</button>
+        </form>
+        <div class="switch-row">
+          还没有账号？<a id="toRegister">立即注册</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 注册页 -->
+  <section class="view hidden" id="registerView">
+    <div class="card">
+      <div class="card-top">
+        <span class="win-dot dot-red"></span>
+        <span class="win-dot dot-yel"></span>
+        <span class="win-dot dot-grn"></span>
+        <span class="title mono">register.py — 创建账号</span>
+      </div>
+      <div class="card-body">
+        <form id="registerForm" autocomplete="off">
+          <div class="field">
+            <label class="label" for="regUsername">用户名 <span class="req">*</span></label>
+            <input class="input mono" id="regUsername" type="text" placeholder="至少 2 个字符" required />
+          </div>
+          <div class="field">
+            <label class="label" for="regEmail">邮箱 <span class="req">*</span></label>
+            <input class="input mono" id="regEmail" type="email" placeholder="用于接收验证码" required />
+          </div>
+          <div class="field">
+            <label class="label" for="regPassword">密码 <span class="req">*</span></label>
+            <input class="input mono" id="regPassword" type="password" placeholder="至少 6 位" required />
+          </div>
+          <div class="field">
+            <label class="label" for="regCode">邮箱验证码 <span class="req">*</span></label>
+            <div class="row">
+              <input class="input mono" id="regCode" type="text" placeholder="6 位验证码" maxlength="6" required />
+              <button type="button" class="btn-sm" id="regSendCode">发送验证码</button>
+            </div>
+          </div>
+          <button class="primary-btn" type="submit">注 册</button>
+        </form>
+        <div class="switch-row">
+          已有账号？<a id="toLogin">返回登录</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 忘记密码页 -->
+  <section class="view hidden" id="forgotView">
+    <div class="card">
+      <div class="card-top">
+        <span class="win-dot dot-red"></span>
+        <span class="win-dot dot-yel"></span>
+        <span class="win-dot dot-grn"></span>
+        <span class="title mono">reset.py — 找回密码</span>
+      </div>
+      <div class="card-body">
+        <form id="forgotForm" autocomplete="off">
+          <div class="field">
+            <label class="label" for="forgotEmail">注册邮箱 <span class="req">*</span></label>
+            <input class="input mono" id="forgotEmail" type="email" placeholder="请输入注册邮箱" required />
+          </div>
+          <div class="sending-tip" id="forgotSendingTip">
+            正在向 <span class="email-mono" id="forgotMaskedEmail">xxx.xxx</span> 发送确认...
+          </div>
+          <div class="field">
+            <label class="label" for="forgotCode">邮箱验证码 <span class="req">*</span></label>
+            <div class="row">
+              <input class="input mono" id="forgotCode" type="text" placeholder="6 位验证码" maxlength="6" required />
+              <button type="button" class="btn-sm" id="forgotSendCode">发送验证码</button>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="forgotNewPwd">新密码 <span class="req">*</span></label>
+            <input class="input mono" id="forgotNewPwd" type="password" placeholder="至少 6 位" required />
+          </div>
+          <button class="primary-btn" type="submit">重置密码</button>
+        </form>
+        <div class="switch-row">
+          想起密码了？<a id="forgotToLogin">返回登录</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 欢迎页 -->
+  <section class="view hidden" id="welcomeView">
+    <div class="welcome">
+      <div class="time-block">
+        <div class="clock mono" id="clock">00:00:00</div>
+        <div class="date" id="date">—</div>
+      </div>
+
+      <div class="greeting-card">
+        <div class="greeting">
+          <span class="salute" id="salute">你好</span>
+          <span class="name" id="userName">玩家</span>
+        </div>
+        <p class="sub">欢迎回到编程有趣游戏赛事平台，祝你今天取得好成绩。</p>
+        <div class="code-line mono">
+          <span class="var">player</span><span class="eq">=</span><span class="val" id="playerVar">null</span><span class="cursor"></span>
+        </div>
+      </div>
+
+      <div class="users-section">
+        <div class="users-title">
+          <span>赛事公告</span>
+          <span class="count" id="tourCount">0</span>
+        </div>
+        <div class="users-list" id="tourList">
+          <div class="user-row"><div class="user-info" style="color:var(--muted);font-size:13px;">暂无赛事</div></div>
+        </div>
+      </div>
+
+      <div class="admin-apply-section" id="adminApplySection" style="display:none;">
+        <button class="back-btn" id="openApplyBtn" style="border-color:var(--accent);color:var(--accent);">申请成为管理员</button>
+        <div id="applyStatusBox" style="margin-top:12px;"></div>
+      </div>
+      <div id="adminLinks" style="margin-top:14px;display:none;gap:10px;justify-content:center;">
+        <a href="admin.html" class="back-btn" style="text-decoration:none;display:inline-block;">管理员入口</a>
+        <a href="super-admin.html" class="back-btn" style="text-decoration:none;display:inline-block;">超管入口</a>
+      </div>
+
+      <button class="back-btn" id="logoutBtn">退出登录</button>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const views = {
+    login: $('loginView'), register: $('registerView'),
+    forgot: $('forgotView'), welcome: $('welcomeView'),
+  };
+
+  let currentUser = null;
+
+  function showView(name) {
+    Object.values(views).forEach(v => v.classList.add('hidden'));
+    const v = views[name];
+    v.classList.remove('hidden');
+    v.style.animation = 'none';
+    void v.offsetWidth;
+    v.style.animation = '';
+  }
+
+  function toast(msg, type = '') {
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + type;
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 2600);
+  }
+
+  function maskEmail(email) {
+    const [name, domain] = email.split('@');
+    if (!domain) return email;
+    const visible = name.slice(0, 3);
+    return visible + '***@' + domain;
+  }
+
+  // ===== 时间段问候 =====
+  function getSalute(hour) {
+    if (hour >= 0 && hour < 5) return '你怎么还没睡？';
+    if (hour >= 5 && hour < 11) return '早上好，';
+    if (hour >= 11 && hour < 13) return '中午好，';
+    if (hour >= 13 && hour < 18) return '下午好，';
+    return '晚上好，';
+  }
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function updateTime() {
+    const now = new Date();
+    $('clock').textContent = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+    const wd = ['周日','周一','周二','周三','周四','周五','周六'][now.getDay()];
+    $('date').textContent = now.getFullYear() + '年' + (now.getMonth()+1) + '月' + now.getDate() + '日 ' + wd;
+    if (!views.welcome.classList.contains('hidden')) {
+      $('salute').textContent = getSalute(now.getHours());
+    }
+  }
+  setInterval(updateTime, 1000);
+  updateTime();
+
+  // ===== 倒计时（发送验证码按钮） =====
+  function startCountdown(btn, seconds = 60) {
+    let s = seconds;
+    btn.disabled = true;
+    btn.textContent = s + 's 后重发';
+    const t = setInterval(() => {
+      s--;
+      if (s <= 0) {
+        clearInterval(t);
+        btn.disabled = false;
+        btn.textContent = '发送验证码';
+      } else {
+        btn.textContent = s + 's 后重发';
+      }
+    }, 1000);
+  }
+
+  // ===== 登录 =====
+  $('loginForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const account = $('loginAccount').value.trim();
+    const password = $('loginPassword').value;
+    const r = DB.login({ account, password });
+    if (r.ok) {
+      currentUser = r.user;
+      enterWelcome();
+    } else {
+      toast(r.msg || '登录失败', 'error');
+    }
+  });
+
+  // ===== 注册：发送验证码 =====
+  $('regSendCode').addEventListener('click', () => {
+    const email = $('regEmail').value.trim();
+    if (!email) { toast('请先填写邮箱', 'error'); return; }
+    const r = DB.sendRegisterCode(email);
+    if (r.ok) {
+      toast('验证码：' + r.code + '（页内显示，无邮件发送）', 'success');
+      startCountdown($('regSendCode'));
+    } else {
+      toast(r.msg || '发送失败', 'error');
+    }
+  });
+
+  // ===== 注册提交 =====
+  $('registerForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const username = $('regUsername').value.trim();
+    const email = $('regEmail').value.trim();
+    const password = $('regPassword').value;
+    const code = $('regCode').value.trim();
+    const r = DB.register({ username, email, password, code });
+    if (r.ok) {
+      toast('注册成功，请登录', 'success');
+      setTimeout(() => { goLogin(); $('loginAccount').value = username; }, 800);
+    } else {
+      toast(r.msg || '注册失败', 'error');
+    }
+  });
+
+  // ===== 忘记密码：发送验证码 =====
+  $('forgotSendCode').addEventListener('click', () => {
+    const email = $('forgotEmail').value.trim();
+    if (!email) { toast('请先填写邮箱', 'error'); return; }
+    $('forgotMaskedEmail').textContent = maskEmail(email);
+    $('forgotSendingTip').classList.add('show');
+    const r = DB.sendResetCode(email);
+    if (r.ok) {
+      toast('验证码：' + r.code + '（页内显示，无邮件发送）', 'success');
+      startCountdown($('forgotSendCode'));
+    } else {
+      toast(r.msg || '发送失败', 'error');
+    }
+  });
+
+  // ===== 忘记密码：重置 =====
+  $('forgotForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const email = $('forgotEmail').value.trim();
+    const code = $('forgotCode').value.trim();
+    const newPassword = $('forgotNewPwd').value;
+    const r = DB.resetPassword({ email, code, newPassword });
+    if (r.ok) {
+      toast('密码已重置，请登录', 'success');
+      setTimeout(() => goLogin(), 900);
+    } else {
+      toast(r.msg || '重置失败', 'error');
+    }
+  });
+
+  // ===== 欢迎页 =====
+  function enterWelcome() {
+    $('userName').textContent = currentUser.username;
+    $('playerVar').textContent = '"' + currentUser.username + '"';
+    $('headerRight').innerHTML = '<span class="dot"></span><span>' + currentUser.username + ' 已登录</span>';
+    showView('welcome');
+    updateTime();
+    loadTournaments();
+    loadApplyStatus();
+    if (currentUser.role === 'user') {
+      $('adminApplySection').style.display = 'block';
+    } else {
+      $('adminApplySection').style.display = 'none';
+    }
+    $('adminLinks').style.display = 'flex';
+  }
+
+  function loadTournaments() {
+    const r = DB.publicTournaments();
+    const list = $('tourList');
+    if (r.ok && r.tournaments.length > 0) {
+      $('tourCount').textContent = r.tournaments.length;
+      list.innerHTML = r.tournaments.map(t => {
+        const d = new Date(t.createdAt);
+        return `<div class="user-row">
+          <div class="avatar" style="background:linear-gradient(135deg,var(--accent),var(--accent-2));">${t.title.charAt(0).toUpperCase()}</div>
+          <div class="user-info">
+            <div class="user-name">${t.title}${t.gameType ? ' <span style="color:var(--func);font-size:11px;">[' + t.gameType + ']</span>' : ''}</div>
+            <div class="user-email" style="color:var(--tag);">${t.winCondition.slice(0,60)}${t.winCondition.length>60?'...':''}</div>
+          </div>
+          <div class="user-time">by ${t.createdBy}</div>
+        </div>`;
+      }).join('');
+    } else {
+      $('tourCount').textContent = '0';
+      list.innerHTML = '<div class="user-row"><div class="user-info" style="color:var(--muted);font-size:13px;">暂无赛事</div></div>';
+    }
+  }
+
+  function loadApplyStatus() {
+    const r = DB.adminApplyStatus();
+    const box = $('applyStatusBox');
+    if (r.ok && r.applications.length > 0) {
+      const latest = r.applications[r.applications.length - 1];
+      if (latest.status === 'pending') {
+        box.innerHTML = '<div style="padding:10px 14px;background:rgba(88,166,255,0.08);border:1px solid rgba(88,166,255,0.25);border-radius:8px;font-size:12.5px;color:var(--accent);">申请审核中...</div>';
+        $('openApplyBtn').style.display = 'none';
+      } else if (latest.status === 'approved') {
+        box.innerHTML = '<div style="padding:10px 14px;background:rgba(126,231,135,0.08);border:1px solid rgba(126,231,135,0.25);border-radius:8px;font-size:12.5px;color:var(--accent-2);">已通过！请前往管理员入口登录</div>';
+        $('openApplyBtn').style.display = 'none';
+      } else if (latest.status === 'rejected') {
+        box.innerHTML = '<div style="padding:10px 14px;background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.25);border-radius:8px;font-size:12.5px;color:#ff8b83;">已被拒绝' + (latest.rejectReason ? '：' + latest.rejectReason : '') + '</div>';
+        $('openApplyBtn').style.display = '';
+      }
+    }
+  }
+
+  // ===== 管理员申请弹窗 =====
+  function openApplyModal() {
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;display:flex;align-items:center;justify-content:center;';
+    modal.innerHTML = `<div style="background:var(--bg-2);border:1px solid var(--line);border-radius:14px;padding:28px;max-width:400px;width:90%;box-shadow:var(--shadow);">
+      <h3 style="margin:0 0 18px;font-size:18px;">申请管理员</h3>
+      <div style="margin-bottom:14px;"><label style="display:block;font-size:13px;color:var(--muted);margin-bottom:6px;">密码A <span style="color:var(--keyword)">*</span></label>
+      <input id="applyPwdA" type="password" class="input mono" placeholder="至少6位" style="width:100%;background:var(--bg-0);border:1px solid var(--line);color:var(--text);padding:11px 14px;border-radius:8px;font-size:14px;outline:none;" /></div>
+      <div style="margin-bottom:14px;"><label style="display:block;font-size:13px;color:var(--muted);margin-bottom:6px;">密码B <span style="color:var(--keyword)">*</span></label>
+      <input id="applyPwdB" type="password" class="input mono" placeholder="不能与密码A相同" style="width:100%;background:var(--bg-0);border:1px solid var(--line);color:var(--text);padding:11px 14px;border-radius:8px;font-size:14px;outline:none;" /></div>
+      <div style="margin-bottom:18px;"><label style="display:block;font-size:13px;color:var(--muted);margin-bottom:6px;">申请理由 <span style="color:var(--keyword)">*</span></label>
+      <textarea id="applyReason" class="input mono" placeholder="为什么想成为管理员？" style="width:100%;min-height:70px;background:var(--bg-0);border:1px solid var(--line);color:var(--text);padding:11px 14px;border-radius:8px;font-size:14px;outline:none;resize:vertical;font-family:inherit;"></textarea></div>
+      <div style="display:flex;gap:10px;">
+        <button id="submitApply" style="flex:1;padding:11px;background:linear-gradient(90deg,var(--accent),#3a8bff);border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">提交申请</button>
+        <button id="cancelApply" style="padding:11px 20px;background:transparent;border:1px solid var(--line);border-radius:8px;color:var(--muted);font-size:14px;cursor:pointer;">取消</button>
+      </div></div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('#cancelApply').onclick = () => modal.remove();
+    modal.querySelector('#submitApply').onclick = () => {
+      const passwordA = modal.querySelector('#applyPwdA').value;
+      const passwordB = modal.querySelector('#applyPwdB').value;
+      const reason = modal.querySelector('#applyReason').value.trim();
+      const r = DB.adminApply({ passwordA, passwordB, reason });
+      if (r.ok) { toast('申请已提交', 'success'); modal.remove(); loadApplyStatus(); }
+      else toast(r.msg || '提交失败', 'error');
+    };
+  }
+  $('openApplyBtn').addEventListener('click', openApplyModal);
+
+  // ===== 导航 =====
+  function goLogin() { showView('login'); $('loginAccount').focus(); }
+  function goRegister() { showView('register'); $('regUsername').focus(); }
+  function goForgot() {
+    showView('forgot');
+    $('forgotEmail').focus();
+    $('forgotSendingTip').classList.remove('show');
+  }
+
+  $('toRegister').addEventListener('click', goRegister);
+  $('toLogin').addEventListener('click', goLogin);
+  $('toForgot').addEventListener('click', goForgot);
+  $('forgotToLogin').addEventListener('click', goLogin);
+  $('logoutBtn').addEventListener('click', () => {
+    currentUser = null;
+    DB.clearSession();
+    $('headerRight').innerHTML = '<span class="dot"></span><span>在线</span>';
+    $('loginForm').reset();
+    goLogin();
+  });
+</script>
+
+</body>
+</html>

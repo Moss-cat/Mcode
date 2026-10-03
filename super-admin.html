@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>总管理员 - 编程有趣游戏赛事</title>
+<style>
+  :root{--bg-0:#0a0e14;--bg-1:#0f1620;--bg-2:#131c28;--line:#1f2a37;--text:#e6edf3;--muted:#7d8b9a;--keyword:#ff7b72;--func:#d2a8ff;--str:#a5d6ff;--tag:#7ee787;--num:#f2cc60;--accent:#58a6ff;--accent-2:#7ee787;--danger:#f85149;--shadow:0 20px 60px rgba(0,0,0,.5)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{min-height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);background:radial-gradient(1200px 800px at 20% -10%,#1a1020 0%,transparent 60%),radial-gradient(900px 700px at 110% 110%,#1a2b1e 0%,transparent 55%),linear-gradient(180deg,var(--bg-0),var(--bg-1))}
+  .mono{font-family:"JetBrains Mono","Fira Code","Cascadia Code","Consolas",monospace}
+  .grid-bg{position:fixed;inset:0;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:44px 44px;opacity:.18;mask-image:radial-gradient(circle at 50% 40%,#000 0%,transparent 75%);pointer-events:none;z-index:0}
+  header{position:fixed;top:0;left:0;right:0;height:60px;display:flex;align-items:center;padding:0 28px;border-bottom:1px solid var(--line);background:rgba(10,14,20,.72);backdrop-filter:blur(12px);z-index:10}
+  .brand{display:flex;align-items:center;font-size:17px;font-weight:600;cursor:pointer;gap:0}
+  .brand .hash{color:var(--num)}.brand .bl{color:var(--danger)}.brand .sl{color:var(--muted)}.brand .cn{color:var(--text);margin:0 2px}
+  .header-right{margin-left:auto;display:flex;align-items:center;gap:14px;color:var(--muted);font-size:13px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--danger);box-shadow:0 0 12px var(--danger);animation:pulse 1.8s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.85)}}
+  main{min-height:100%;display:flex;align-items:center;justify-content:center;padding:80px 24px 40px;position:relative;z-index:1}
+  .view{width:100%;animation:fadeUp .45s cubic-bezier(.22,1,.36,1)}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+  .hidden{display:none}
+  .card{max-width:400px;margin:0 auto;background:linear-gradient(180deg,rgba(19,28,40,.92),rgba(15,22,32,.92));border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+  .card-top{display:flex;align-items:center;gap:7px;padding:13px 16px;border-bottom:1px solid var(--line);background:rgba(0,0,0,.2)}
+  .wd{width:12px;height:12px;border-radius:50%}.dr{background:#ff5f57}.dy{background:#febc2e}.dg{background:#28c840}
+  .card-top .title{margin-left:8px;color:var(--muted);font-size:12.5px}
+  .card-body{padding:28px}
+  .label{display:block;font-size:13px;color:var(--muted);margin-bottom:7px}.label .req{color:var(--keyword)}
+  .input{width:100%;background:var(--bg-2);border:1px solid var(--line);color:var(--text);padding:11px 14px;border-radius:8px;font-size:14px;outline:none;transition:border-color .18s,box-shadow .18s;font-family:inherit}
+  .input:focus{border-color:var(--danger);box-shadow:0 0 0 3px rgba(248,81,73,.18)}
+  .field+.field{margin-top:14px}
+  .layer-badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:4px;margin-bottom:4px;font-weight:600}
+  .layer-1{background:rgba(248,81,73,.15);color:var(--danger)}
+  .layer-2{background:rgba(255,123,114,.15);color:#ff7b72}
+  .layer-3{background:rgba(242,204,96,.15);color:var(--num)}
+  .layer-4{background:rgba(210,168,255,.15);color:var(--func)}
+  .layer-5{background:rgba(88,166,255,.15);color:var(--accent)}
+  .layer-6{background:rgba(126,231,135,.15);color:var(--accent-2)}
+  .row{display:flex;gap:10px}.row .input{flex:1}
+  .btn-sm{white-space:nowrap;background:var(--bg-2);border:1px solid var(--line);color:var(--danger);padding:0 14px;border-radius:8px;font-size:13px;cursor:pointer;transition:all .18s;font-family:inherit}
+  .btn-sm:hover:not(:disabled){border-color:var(--danger);background:rgba(248,81,73,.1)}
+  .btn-sm:disabled{color:var(--muted);cursor:not-allowed;opacity:.6}
+  .cred-tip{margin-top:14px;padding:10px 14px;background:rgba(242,204,96,.06);border:1px solid rgba(242,204,96,.2);border-radius:8px;font-size:12px;color:var(--num);line-height:1.6}
+  .cred-tip a{color:var(--danger);cursor:pointer;text-decoration:underline}
+  .step{animation:fadeUp .45s cubic-bezier(.22,1,.36,1)}
+  .step-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+  .step-sub{font-size:11px;color:var(--muted);font-weight:400;margin-left:6px}
+  .email-box{padding:10px 12px;background:var(--bg-2);border:1px solid var(--line);border-radius:8px;font-size:13px;color:var(--str);margin-bottom:14px;line-height:1.5}
+  .cannot-row{margin-top:10px;font-size:12px;text-align:right}
+  .cannot-row a{color:var(--danger);cursor:pointer;text-decoration:underline}
+  .btn-row{display:flex;gap:10px;margin-top:20px;align-items:center}
+  .btn-row .primary-btn{margin-top:0;flex:1}
+  .primary-btn{width:100%;margin-top:20px;padding:12px;background:linear-gradient(90deg,var(--danger),#ff6b5e);border:none;border-radius:8px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:transform .12s,box-shadow .18s,filter .18s;font-family:inherit}
+  .primary-btn:hover{filter:brightness(1.08);box-shadow:0 8px 24px rgba(248,81,73,.35)}
+  .primary-btn:active{transform:translateY(1px)}
+  .toast{position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-20px);background:var(--bg-2);border:1px solid var(--line);color:var(--text);padding:11px 20px;border-radius:8px;font-size:13.5px;box-shadow:var(--shadow);z-index:100;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.success{border-color:rgba(126,231,135,.5)}.toast.error{border-color:rgba(248,81,73,.5);color:#ffd4d1}
+  .dashboard{max-width:840px;width:100%}
+  .tabs{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap}
+  .tab{padding:9px 16px;border:1px solid var(--line);border-radius:8px;background:var(--bg-2);color:var(--muted);font-size:13.5px;cursor:pointer;transition:all .18s;font-family:inherit}
+  .tab.active{border-color:var(--danger);color:var(--danger);background:rgba(248,81,73,.08)}
+  .tab:hover{border-color:var(--danger)}
+  .panel{background:rgba(19,28,40,.6);border:1px solid var(--line);border-radius:12px;padding:24px;display:none}
+  .panel.active{display:block;animation:fadeUp .3s ease}
+  .panel h3{font-size:16px;margin-bottom:16px}
+  .list-item{background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:12px}
+  .it-title{font-size:14.5px;font-weight:600}.it-meta{font-size:12px;color:var(--muted);margin-top:4px}.it-desc{font-size:13px;color:var(--str);margin-top:8px;line-height:1.6}
+  .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+  .badge-user{background:rgba(125,139,154,.15);color:var(--muted)}.badge-admin{background:rgba(210,168,255,.15);color:var(--func)}.badge-superadmin{background:rgba(248,81,73,.15);color:var(--danger)}
+  .badge-pending{background:rgba(242,204,96,.15);color:var(--num)}.badge-approved{background:rgba(126,231,135,.15);color:var(--accent-2)}.badge-rejected{background:rgba(248,81,73,.15);color:var(--danger)}
+  .badge-active{background:rgba(126,231,135,.15);color:var(--accent-2)}.badge-cancelled{background:rgba(248,81,73,.15);color:var(--danger)}.badge-completed{background:rgba(88,166,255,.15);color:var(--accent)}
+  .badge-banned{background:rgba(248,81,73,.15);color:var(--danger)}.badge-ok{background:rgba(126,231,135,.15);color:var(--accent-2)}
+  .act-btn{margin-top:8px;padding:7px 14px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--text);font-size:12.5px;cursor:pointer;transition:all .18s;margin-right:8px;font-family:inherit}
+  .act-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .act-btn.danger:hover{border-color:var(--danger);color:var(--danger)}
+  .act-btn.success:hover{border-color:var(--accent-2);color:var(--accent-2)}
+  .empty{text-align:center;color:var(--muted);font-size:13px;padding:20px}
+  a.back-link{color:var(--danger);text-decoration:none;font-size:13px}a.back-link:hover{text-decoration:underline}
+  .stats{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+  .stat-box{flex:1;min-width:120px;background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:16px;text-align:center}
+  .stat-num{font-size:28px;font-weight:700;color:var(--accent)}.stat-label{font-size:11px;color:var(--muted);margin-top:4px}
+  @media(max-width:520px){.tabs{gap:4px}.tab{padding:7px 12px;font-size:12px}.stats{gap:8px}.stat-box{min-width:90px;padding:12px}}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<header>
+  <div class="brand mono" onclick="location.href='index.html'">
+    <span class="hash">#</span><span class="bl">&lt;</span><span class="sl">/</span><span class="bl">&gt;</span><span class="cn">总管理员控制台</span><span class="bl">&lt;</span><span class="sl">/</span><span class="bl">&gt;</span>
+  </div>
+  <div class="header-right" id="headerRight"><span class="dot"></span><span>未登录</span></div>
+</header>
+
+<main>
+  <section class="view" id="loginView">
+    <div class="card" style="max-width:480px;">
+      <div class="card-top"><span class="wd dr"></span><span class="wd dy"></span><span class="wd dg"></span><span class="title mono">root_auth.py — 超管五重验证</span></div>
+      <div class="card-body">
+        <form id="loginForm" autocomplete="off">
+
+          <!-- 第一步：5 个凭证框 -->
+          <div class="step" id="stepCreds">
+            <div class="step-title">第一步：填写凭证 <span class="step-sub">(5 项必填)</span></div>
+            <div class="field">
+              <label class="label">用户名 <span class="req">*</span></label>
+              <input class="input mono" id="username" placeholder="MoSS" required autofocus />
+            </div>
+            <div class="field">
+              <label class="label">密码A <span class="req">*</span></label>
+              <input class="input mono" id="passwordA" type="password" placeholder="主密码" required />
+            </div>
+            <div class="field">
+              <label class="label">密码B <span class="req">*</span></label>
+              <input class="input mono" id="passwordB" type="password" placeholder="次密码" required />
+            </div>
+            <div class="field">
+              <label class="label">邮箱A <span class="req">*</span></label>
+              <input class="input mono" id="emailA" type="email" placeholder="主邮箱" required />
+            </div>
+            <div class="field">
+              <label class="label">邮箱B <span class="req">*</span></label>
+              <input class="input mono" id="emailB" type="email" placeholder="备份邮箱" required />
+            </div>
+            <button class="primary-btn" type="button" id="confirmBtn">确 认</button>
+          </div>
+
+          <!-- 第二步：验证码 -->
+          <div class="step hidden" id="stepCode">
+            <div class="step-title">第二步：邮箱验证码 <span class="step-sub">(默认发往邮箱A)</span></div>
+            <div class="email-box">
+              当前接收邮箱：<span id="emailDisplay" class="mono">—</span>
+            </div>
+            <div class="field">
+              <label class="label">验证码 <span class="req">*</span></label>
+              <div class="row">
+                <input class="input mono" id="code" type="text" placeholder="6位验证码" maxlength="6" required />
+                <button type="button" class="btn-sm" id="sendCode">发送验证码</button>
+              </div>
+            </div>
+            <div class="cannot-row">
+              <a id="cannotReceive">Cannot Receive? 切换到邮箱B</a>
+            </div>
+            <div class="btn-row">
+              <button class="act-btn" type="button" id="backBtn">返回修改</button>
+              <button class="primary-btn" type="submit">登 录</button>
+            </div>
+          </div>
+
+        </form>
+        <div style="margin-top:16px;text-align:center"><a href="index.html" class="back-link">返回主站</a></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view hidden" id="dashView">
+    <div class="dashboard">
+      <div class="stats" id="stats"></div>
+      <div class="tabs">
+        <button class="tab active" data-tab="users">用户管理</button>
+        <button class="tab" data-tab="apps">管理员申请</button>
+        <button class="tab" data-tab="kicks">踢人申请</button>
+        <button class="tab" data-tab="tours">赛事管理</button>
+        <button class="tab" data-tab="settings">设置</button>
+      </div>
+      <div class="panel active" id="panel-users"><h3>所有用户</h3><div id="userList"><div class="empty">加载中...</div></div></div>
+      <div class="panel" id="panel-apps"><h3>管理员申请</h3><div id="appList"><div class="empty">加载中...</div></div></div>
+      <div class="panel" id="panel-kicks"><h3>踢人申请</h3><div id="kickList"><div class="empty">加载中...</div></div></div>
+      <div class="panel" id="panel-tours"><h3>所有赛事</h3><div id="tourList"><div class="empty">加载中...</div></div></div>
+      <div class="panel" id="panel-settings"><h3>系统设置</h3>
+        <div style="padding:14px;background:rgba(88,166,255,.06);border:1px solid rgba(88,166,255,.2);border-radius:8px;font-size:13px;color:var(--accent);margin-bottom:20px;line-height:1.6;">
+          超管登录为五重验证（用户名 + 密码A + 密码B + 邮箱A + 邮箱B + 邮箱验证码）。先填 5 个凭证点确认，再收验证码。验证码默认发往邮箱A，可通过「Cannot Receive?」切换至邮箱B。
+        </div>
+        <form id="pwdForm">
+          <div class="field"><label class="label">旧密码A</label><input class="input mono" id="oldPwd" type="password" /></div>
+          <div class="field"><label class="label">新密码A</label><input class="input mono" id="newPwd" type="password" /></div>
+          <button class="act-btn" type="submit">修改密码A</button>
+        </form>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+function toast(m,t=''){const e=$('toast');e.textContent=m;e.className='toast show '+t;clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),3000)}
+function pad(n){return n<10?'0'+n:''+n}
+function startCountdown(btn,s=60){let t=s;btn.disabled=true;btn.textContent=t+'s';const i=setInterval(()=>{t--;if(t<=0){clearInterval(i);btn.disabled=false;btn.textContent='发送验证码'}else btn.textContent=t+'s'},1000)}
+function badge(role){return `<span class="badge badge-${role}">${role==='superadmin'?'超管':role==='admin'?'管理员':'用户'}</span>`}
+
+// 当前选中的接收邮箱（默认邮箱A，点击 Cannot Receive? 切到邮箱B）
+let currentEmail='';
+let useEmailA=true;
+
+function updateEmailDisplay(){
+  const a=$('emailA').value.trim();
+  const b=$('emailB').value.trim();
+  currentEmail=useEmailA?a:b;
+  $('emailDisplay').textContent=currentEmail||'—';
+  const link=$('cannotReceive');
+  link.textContent=useEmailA?'Cannot Receive? 切换到邮箱B':'切换回邮箱A';
+}
+
+// 第一步：确认 5 个凭证框
+$('confirmBtn').addEventListener('click',()=>{
+  const username=$('username').value.trim();
+  const pwdA=$('passwordA').value;
+  const pwdB=$('passwordB').value;
+  const emailA=$('emailA').value.trim();
+  const emailB=$('emailB').value.trim();
+  if(!username){toast('请填写用户名','error');return}
+  if(!pwdA){toast('请填写密码A','error');return}
+  if(!pwdB){toast('请填写密码B','error');return}
+  if(!emailA){toast('请填写邮箱A','error');return}
+  if(!emailB){toast('请填写邮箱B','error');return}
+  // 校验两个邮箱必须匹配系统设定
+  const s=DB.getSettings();
+  if(emailA!==s.superAdminEmail){toast('邮箱A不正确','error');return}
+  if(emailB!==s.superAdminEmailBackup){toast('邮箱B不正确','error');return}
+  // 进入第二步
+  useEmailA=true;
+  updateEmailDisplay();
+  $('stepCreds').classList.add('hidden');
+  $('stepCode').classList.remove('hidden');
+  $('code').focus();
+});
+
+// 返回修改凭证
+$('backBtn').addEventListener('click',()=>{
+  $('stepCode').classList.add('hidden');
+  $('stepCreds').classList.remove('hidden');
+  $('code').value='';
+});
+
+// 发送验证码（发往 currentEmail）
+$('sendCode').addEventListener('click',()=>{
+  if(!currentEmail){toast('请先完成第一步','error');return}
+  const r=DB.superAdminSendCode(currentEmail);
+  if(r.ok){toast('验证码：'+r.code+'（已发至 '+currentEmail+'，页内显示）','success');startCountdown($('sendCode'))}else toast(r.msg||'发送失败','error')
+});
+
+// Cannot Receive? 切换邮箱并自动重发
+$('cannotReceive').addEventListener('click',()=>{
+  useEmailA=!useEmailA;
+  updateEmailDisplay();
+  const r=DB.superAdminSendCode(currentEmail);
+  if(r.ok){toast('验证码：'+r.code+'（已切换至 '+currentEmail+'）','success');startCountdown($('sendCode'))}else toast(r.msg||'切换失败','error')
+});
+
+// 五重验证登录
+$('loginForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const r=DB.superAdminLogin({
+    username:$('username').value.trim(),
+    passwordA:$('passwordA').value,
+    passwordB:$('passwordB').value,
+    email:currentEmail,
+    code:$('code').value.trim()
+  });
+  if(r.ok){$('headerRight').innerHTML='<span class="dot"></span><span>'+r.username+'</span>';
+    $('loginView').classList.add('hidden');$('dashView').classList.remove('hidden');loadAll()}
+  else toast(r.msg||'登录失败','error')
+});
+
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');$('panel-'+t.dataset.tab).classList.add('active');
+}));
+
+function loadAll(){loadUsers();loadApps();loadKicks();loadTours()}
+
+function loadUsers(){
+  const r=DB.superAdminUsers();
+  const box=$('userList');
+  if(r.ok&&r.users.length){
+    $('stats').innerHTML=`<div class="stat-box"><div class="stat-num">${r.users.length}</div><div class="stat-label">总用户</div></div>
+      <div class="stat-box"><div class="stat-num">${r.users.filter(u=>u.role==='admin').length}</div><div class="stat-label">管理员</div></div>
+      <div class="stat-box"><div class="stat-num">${r.users.filter(u=>u.banned).length}</div><div class="stat-label">已封禁</div></div>`;
+    box.innerHTML=r.users.map(u=>{
+      const d=new Date(u.createdAt);
+      return `<div class="list-item"><div class="it-title">${u.username} ${badge(u.role)} ${u.banned?'<span class="badge badge-banned">已封禁</span>':'<span class="badge badge-ok">正常</span>'}</div>
+      <div class="it-meta">${u.email} | 注册:${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}${u.banReason?' | 原因:'+u.banReason:''}</div>
+      ${u.role!=='superadmin'?`<button class="act-btn danger" onclick="kickUser('${u.id}','${u.username}')">踢出</button>
+      ${u.banned?'<button class="act-btn success" onclick="banUser(\''+u.id+'\',false)">解封</button>':'<button class="act-btn" onclick="banUser(\''+u.id+'\',true)">封禁</button>'}`:''}</div>`
+    }).join('')
+  }else{
+    $('stats').innerHTML=`<div class="stat-box"><div class="stat-num">0</div><div class="stat-label">总用户</div></div>
+      <div class="stat-box"><div class="stat-num">0</div><div class="stat-label">管理员</div></div>
+      <div class="stat-box"><div class="stat-num">0</div><div class="stat-label">已封禁</div></div>`;
+    box.innerHTML='<div class="empty">暂无用户</div>'
+  }
+}
+
+function loadApps(){
+  const r=DB.superAdminApplications();
+  const box=$('appList');
+  if(r.ok&&r.applications.length){
+    const pending=r.applications.filter(a=>a.status==='pending');
+    $('stats').innerHTML+=`<div class="stat-box"><div class="stat-num">${pending.length}</div><div class="stat-label">待审申请</div></div>`;
+    box.innerHTML=r.applications.map(a=>{
+      const d=new Date(a.createdAt);
+      return `<div class="list-item"><div class="it-title">${a.username} <span class="badge badge-${a.status}">${a.status==='pending'?'待审核':a.status==='approved'?'已通过':'已拒绝'}</span></div>
+      <div class="it-meta">${a.email} | ${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}</div>
+      <div class="it-desc">理由：${a.reason}</div>${a.passphrase?'<div class="it-desc" style="color:var(--accent-2);font-weight:600;">口令（暗号）：'+a.passphrase+'</div>':''}${a.rejectReason?'<div class="it-desc" style="color:var(--danger)">拒绝：'+a.rejectReason+'</div>':''}
+      ${a.status==='pending'?`<button class="act-btn success" onclick="approveApp('${a.id}','approve')">批准</button><button class="act-btn danger" onclick="rejectApp('${a.id}')">拒绝</button>`:''}</div>`
+    }).join('')
+  }else box.innerHTML='<div class="empty">暂无申请</div>'
+}
+
+function loadKicks(){
+  const r=DB.superAdminKickRequests();
+  const box=$('kickList');
+  if(r.ok&&r.requests.length) box.innerHTML=r.requests.map(k=>{
+    const d=new Date(k.createdAt);
+    return `<div class="list-item"><div class="it-title">${k.requestedBy} → 踢 ${k.targetUsername} <span class="badge badge-${k.status}">${k.status==='pending'?'待审核':k.status==='approved'?'已批准':'已拒绝'}</span></div>
+    <div class="it-meta">${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}</div>
+    <div class="it-desc">理由：${k.reason}</div>${k.rejectReason?'<div class="it-desc" style="color:var(--danger)">拒绝：'+k.rejectReason+'</div>':''}
+    ${k.status==='pending'?`<button class="act-btn success" onclick="approveKick('${k.id}','approve')">批准踢人</button><button class="act-btn danger" onclick="approveKick('${k.id}','reject')">拒绝</button>`:''}</div>`
+  }).join(''); else box.innerHTML='<div class="empty">暂无申请</div>'
+}
+
+function loadTours(){
+  const r=DB.superAdminTournaments();
+  const box=$('tourList');
+  if(r.ok&&r.tournaments.length) box.innerHTML=r.tournaments.map(t=>{
+    const d=new Date(t.createdAt);
+    return `<div class="list-item"><div class="it-title">${t.title} <span class="badge badge-${t.status}">${t.status==='active'?'进行中':t.status==='completed'?'已结束':'已取消'}</span></div>
+    <div class="it-meta">发布者:${t.createdBy} | ${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} | 类型:${t.gameType||'未指定'}</div>
+    <div class="it-desc">输赢条件：${t.winCondition}</div>${t.cancelReason?'<div class="it-desc" style="color:var(--danger)">取消原因：'+t.cancelReason+'</div>':''}
+    ${t.status==='active'?`<button class="act-btn danger" onclick="cancelTour('${t.id}')">取消赛事</button>`:''}</div>`
+  }).join(''); else box.innerHTML='<div class="empty">暂无赛事</div>'
+}
+
+window.kickUser=(id,name)=>{if(!confirm('确定踢出 '+name+'？此操作不可撤销。'))return;const r=DB.superAdminKick({userId:id,reason:'总管理员直接踢出'});if(r.ok){toast(r.msg,'success');loadAll()}else toast(r.msg,'error')};
+window.banUser=(id,banned)=>{const r=DB.superAdminBan({userId:id,banned});if(r.ok){toast(r.msg,'success');loadAll()}else toast(r.msg,'error')};
+window.approveApp=(id,action)=>{const r=DB.superAdminApproveApplication({appId:id,action});if(r.ok){if(r.passphrase){toast('口令: '+r.passphrase+'（请告知该管理员）','success');setTimeout(()=>alert('该管理员的口令（暗号）：\n\n'+r.passphrase+'\n\n请通过安全渠道告知该管理员。'),300)}else toast(r.msg,'success');loadAll()}else toast(r.msg,'error')};
+window.rejectApp=(id)=>{const reason=prompt('拒绝理由：')||'';const r=DB.superAdminApproveApplication({appId:id,action:'reject',rejectReason:reason});if(r.ok){toast(r.msg,'success');loadAll()}else toast(r.msg,'error')};
+window.approveKick=(id,action)=>{const r=DB.superAdminApproveKick({requestId:id,action});if(r.ok){toast(r.msg,'success');loadAll()}else toast(r.msg,'error')};
+window.cancelTour=(id)=>{const reason=prompt('取消原因：')||'';const r=DB.superAdminCancelTournament({id,reason});if(r.ok){toast(r.msg,'success');loadTours()}else toast(r.msg,'error')};
+
+$('pwdForm').addEventListener('submit',e=>{e.preventDefault();const r=DB.superAdminChangePassword({oldPassword:$('#oldPwd').value,newPassword:$('#newPwd').value});if(r.ok){toast('密码A已修改','success');$('#oldPwd').value='';$('#newPwd').value=''}else toast(r.msg,'error')});
+</script>
+</body>
+</html>

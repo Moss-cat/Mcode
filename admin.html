@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>管理员控制台 - 编程有趣游戏赛事</title>
+<style>
+  :root {
+    --bg-0:#0a0e14;--bg-1:#0f1620;--bg-2:#131c28;--line:#1f2a37;
+    --text:#e6edf3;--muted:#7d8b9a;--keyword:#ff7b72;--func:#d2a8ff;
+    --str:#a5d6ff;--tag:#7ee787;--num:#f2cc60;--accent:#58a6ff;
+    --accent-2:#7ee787;--danger:#f85149;--shadow:0 20px 60px rgba(0,0,0,.5);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{min-height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);background:radial-gradient(1200px 800px at 20% -10%,#16223a 0%,transparent 60%),radial-gradient(900px 700px at 110% 110%,#1a2b1e 0%,transparent 55%),linear-gradient(180deg,var(--bg-0),var(--bg-1))}
+  .mono{font-family:"JetBrains Mono","Fira Code","Cascadia Code","Consolas",monospace}
+  .grid-bg{position:fixed;inset:0;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:44px 44px;opacity:.18;mask-image:radial-gradient(circle at 50% 40%,#000 0%,transparent 75%);pointer-events:none;z-index:0}
+  header{position:fixed;top:0;left:0;right:0;height:60px;display:flex;align-items:center;padding:0 28px;border-bottom:1px solid var(--line);background:rgba(10,14,20,.72);backdrop-filter:blur(12px);z-index:10}
+  .brand{display:flex;align-items:center;font-size:17px;font-weight:600;cursor:pointer;gap:0}
+  .brand .hash{color:var(--num)}.brand .bl{color:var(--accent)}.brand .sl{color:var(--muted)}.brand .cn{color:var(--text);margin:0 2px}
+  .header-right{margin-left:auto;display:flex;align-items:center;gap:14px;color:var(--muted);font-size:13px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--accent-2);box-shadow:0 0 12px var(--accent-2);animation:pulse 1.8s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.85)}}
+  main{min-height:100%;display:flex;align-items:center;justify-content:center;padding:80px 24px 40px;position:relative;z-index:1}
+  .view{width:100%;max-width:460px;animation:fadeUp .45s cubic-bezier(.22,1,.36,1)}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+  .hidden{display:none}
+  .card{background:linear-gradient(180deg,rgba(19,28,40,.92),rgba(15,22,32,.92));border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+  .card-top{display:flex;align-items:center;gap:7px;padding:13px 16px;border-bottom:1px solid var(--line);background:rgba(0,0,0,.2)}
+  .wd{width:12px;height:12px;border-radius:50%}.dr{background:#ff5f57}.dy{background:#febc2e}.dg{background:#28c840}
+  .card-top .title{margin-left:8px;color:var(--muted);font-size:12.5px}
+  .card-body{padding:28px}
+  .label{display:block;font-size:13px;color:var(--muted);margin-bottom:7px}.label .req{color:var(--keyword)}
+  .input{width:100%;background:var(--bg-2);border:1px solid var(--line);color:var(--text);padding:11px 14px;border-radius:8px;font-size:14px;outline:none;transition:border-color .18s,box-shadow .18s;font-family:inherit}
+  .input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(88,166,255,.18)}
+  .field+.field{margin-top:14px}
+  .row{display:flex;gap:10px}.row .input{flex:1}
+  .btn-sm{white-space:nowrap;background:var(--bg-2);border:1px solid var(--line);color:var(--accent);padding:0 14px;border-radius:8px;font-size:13px;cursor:pointer;transition:all .18s;font-family:inherit}
+  .btn-sm:hover:not(:disabled){border-color:var(--accent);background:rgba(88,166,255,.1)}
+  .btn-sm:disabled{color:var(--muted);cursor:not-allowed;opacity:.6}
+  .primary-btn{width:100%;margin-top:20px;padding:12px;background:linear-gradient(90deg,var(--accent),#3a8bff);border:none;border-radius:8px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:transform .12s,box-shadow .18s,filter .18s;font-family:inherit}
+  .primary-btn:hover{filter:brightness(1.08);box-shadow:0 8px 24px rgba(88,166,255,.35)}
+  .primary-btn:active{transform:translateY(1px)}
+  .layer-badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:4px;margin-bottom:4px}
+  .layer-1{background:rgba(88,166,255,.15);color:var(--accent)}
+  .layer-2{background:rgba(210,168,255,.15);color:var(--func)}
+  .layer-3{background:rgba(126,231,135,.15);color:var(--accent-2)}
+  .toast{position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-20px);background:var(--bg-2);border:1px solid var(--line);color:var(--text);padding:11px 20px;border-radius:8px;font-size:13.5px;box-shadow:var(--shadow);z-index:100;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.success{border-color:rgba(126,231,135,.5)}.toast.error{border-color:rgba(248,81,73,.5);color:#ffd4d1}
+  /* Dashboard */
+  .dashboard{max-width:760px;width:100%}
+  .tabs{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap}
+  .tab{padding:9px 18px;border:1px solid var(--line);border-radius:8px;background:var(--bg-2);color:var(--muted);font-size:13.5px;cursor:pointer;transition:all .18s;font-family:inherit}
+  .tab.active{border-color:var(--accent);color:var(--accent);background:rgba(88,166,255,.08)}
+  .tab:hover{border-color:var(--accent)}
+  .panel{background:rgba(19,28,40,.6);border:1px solid var(--line);border-radius:12px;padding:24px;display:none}
+  .panel.active{display:block;animation:fadeUp .3s ease}
+  .panel h3{font-size:16px;margin-bottom:16px}
+  textarea.input{min-height:80px;resize:vertical}
+  .list-item{background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:12px}
+  .list-item .it-title{font-size:15px;font-weight:600}.list-item .it-meta{font-size:12px;color:var(--muted);margin-top:4px}
+  .list-item .it-desc{font-size:13px;color:var(--str);margin-top:8px;line-height:1.6}
+  .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+  .badge-active{background:rgba(126,231,135,.15);color:var(--accent-2)}
+  .badge-completed{background:rgba(88,166,255,.15);color:var(--accent)}
+  .badge-cancelled{background:rgba(248,81,73,.15);color:var(--danger)}
+  .badge-pending{background:rgba(242,204,96,.15);color:var(--num)}
+  .badge-approved{background:rgba(126,231,135,.15);color:var(--accent-2)}
+  .badge-rejected{background:rgba(248,81,73,.15);color:var(--danger)}
+  .act-btn{margin-top:10px;padding:7px 16px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--text);font-size:12.5px;cursor:pointer;transition:all .18s;font-family:inherit}
+  .act-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .act-btn.danger:hover{border-color:var(--danger);color:var(--danger)}
+  .empty{text-align:center;color:var(--muted);font-size:13px;padding:20px}
+  a.back-link{color:var(--accent);text-decoration:none;font-size:13px}a.back-link:hover{text-decoration:underline}
+  @media(max-width:520px){.tabs{gap:4px}.tab{padding:7px 12px;font-size:12px}}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<header>
+  <div class="brand mono" onclick="location.href='index.html'">
+    <span class="hash">#</span><span class="bl">&lt;</span><span class="sl">/</span><span class="bl">&gt;</span><span class="cn">管理员控制台</span><span class="bl">&lt;</span><span class="sl">/</span><span class="bl">&gt;</span>
+  </div>
+  <div class="header-right" id="headerRight"><span class="dot"></span><span>未登录</span></div>
+</header>
+
+<main>
+  <!-- 登录页 -->
+  <section class="view" id="loginView">
+    <div class="card">
+      <div class="card-top"><span class="wd dr"></span><span class="wd dy"></span><span class="wd dg"></span><span class="title mono">admin_auth.py — 管理员三重验证</span></div>
+      <div class="card-body">
+        <form id="loginForm" autocomplete="off">
+          <div class="field"><span class="layer-badge layer-1">第一层：邮箱验证</span>
+            <label class="label" for="email">邮箱 <span class="req">*</span></label>
+            <div class="row"><input class="input mono" id="email" type="email" placeholder="管理员邮箱" required /><button type="button" class="btn-sm" id="sendCode">发送验证码</button></div>
+          </div>
+          <div class="field"><label class="label" for="code">验证码 <span class="req">*</span></label><input class="input mono" id="code" type="text" placeholder="6位验证码" maxlength="6" required /></div>
+          <div class="field"><span class="layer-badge layer-2">第二层：双密码</span>
+            <label class="label" for="passwordA">密码A <span class="req">*</span></label><input class="input mono" id="passwordA" type="password" placeholder="密码A" required />
+          </div>
+          <div class="field"><label class="label" for="passwordB">密码B <span class="req">*</span></label><input class="input mono" id="passwordB" type="password" placeholder="密码B" required /></div>
+          <div class="field"><span class="layer-badge layer-3">第三层：身份+暗号</span>
+            <label class="label" for="username">用户名 <span class="req">*</span></label><input class="input mono" id="username" type="text" placeholder="管理员用户名" required />
+          </div>
+          <div class="field"><label class="label" for="passphrase">暗号（口令） <span class="req">*</span></label><input class="input mono" id="passphrase" type="password" placeholder="你的专属口令（如 GAME-XXXX-XXXXXX）" required /></div>
+          <button class="primary-btn" type="submit">三重验证登录</button>
+        </form>
+        <div style="margin-top:16px;text-align:center"><a href="index.html" class="back-link">返回主站</a></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 控制台 -->
+  <section class="view hidden" id="dashView">
+    <div class="dashboard">
+      <div class="tabs">
+        <button class="tab active" data-tab="publish">发布赛事</button>
+        <button class="tab" data-tab="tournaments">我的赛事</button>
+        <button class="tab" data-tab="kick">踢人申请</button>
+      </div>
+      <div class="panel active" id="panel-publish">
+        <h3>发布新赛事</h3>
+        <form id="tourForm" autocomplete="off">
+          <div class="field"><label class="label">赛事名称 <span class="req">*</span></label><input class="input" id="tourTitle" placeholder="如：秋季编程挑战赛" required /></div>
+          <div class="field"><label class="label">游戏类型</label><input class="input" id="tourGameType" placeholder="如：算法竞赛 / 小游戏对战" /></div>
+          <div class="field"><label class="label">赛事描述</label><textarea class="input" id="tourDesc" placeholder="规则简介..."></textarea></div>
+          <div class="field"><label class="label">输赢判断条件 <span class="req">*</span></label><textarea class="input" id="tourWin" placeholder="自行编写输赢判断逻辑，如：得分最高者胜 / 先完成3关者胜 / 最后存活者胜。bug导致比赛无法运行后果自行承担。" style="min-height:100px;"></textarea></div>
+          <div class="field"><label class="label">最大参赛人数</label><input class="input" id="tourMax" type="number" value="8" min="2" /></div>
+          <button class="primary-btn" type="submit">发布赛事</button>
+        </form>
+      </div>
+      <div class="panel" id="panel-tournaments">
+        <h3>我发布的赛事</h3>
+        <div id="myTourList"><div class="empty">加载中...</div></div>
+      </div>
+      <div class="panel" id="panel-kick">
+        <h3>申请踢人</h3>
+        <form id="kickForm" autocomplete="off" style="margin-bottom:20px;">
+          <div class="field"><label class="label">目标用户名 <span class="req">*</span></label><input class="input" id="kickTarget" placeholder="要踢的用户名" required /></div>
+          <div class="field"><label class="label">理由 <span class="req">*</span></label><textarea class="input" id="kickReason" placeholder="详细说明踢人理由..." style="min-height:70px;" required></textarea></div>
+          <button class="primary-btn" type="submit">提交踢人申请</button>
+        </form>
+        <h3 style="margin-top:24px;">我的踢人申请</h3>
+        <div id="myKickList"><div class="empty">加载中...</div></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+function toast(m,t=''){const e=$('toast');e.textContent=m;e.className='toast show '+t;clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),2600)}
+function pad(n){return n<10?'0'+n:''+n}
+function startCountdown(btn,s=60){let t=s;btn.disabled=true;btn.textContent=t+'s';const i=setInterval(()=>{t--;if(t<=0){clearInterval(i);btn.disabled=false;btn.textContent='发送验证码'}else btn.textContent=t+'s'},1000)}
+
+// 登录
+$('sendCode').addEventListener('click',()=>{
+  const email=$('email').value.trim();
+  if(!email){toast('请先填写邮箱','error');return}
+  const r=DB.sendAdminCode(email);
+  if(r.ok){toast('验证码：'+r.code+'（页内显示）','success');startCountdown($('sendCode'))}else toast(r.msg||'发送失败','error')
+});
+$('loginForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const r=DB.adminLogin({
+    email:$('email').value.trim(),code:$('code').value.trim(),passwordA:$('passwordA').value,
+    passwordB:$('passwordB').value,username:$('username').value.trim(),passphrase:$('passphrase').value
+  });
+  if(r.ok){$('headerRight').innerHTML='<span class="dot"></span><span>'+r.user.username+'</span>';
+    $('loginView').classList.add('hidden');$('dashView').classList.remove('hidden');loadAll()}
+  else toast(r.msg||'登录失败','error')
+});
+
+// Tabs
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');$('panel-'+t.dataset.tab).classList.add('active');
+}));
+
+// 发布赛事
+$('tourForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const r=DB.publishTournament({
+    title:$('tourTitle').value.trim(),gameType:$('tourGameType').value.trim(),
+    description:$('tourDesc').value.trim(),winCondition:$('tourWin').value.trim(),
+    maxPlayers:parseInt($('tourMax').value)||8
+  });
+  if(r.ok){toast('赛事已发布','success');$('tourForm').reset();loadMyTournaments()}else toast(r.msg||'发布失败','error')
+});
+
+// 踢人
+$('kickForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const r=DB.kickRequest({targetUsername:$('kickTarget').value.trim(),reason:$('kickReason').value.trim()});
+  if(r.ok){toast('申请已提交','success');$('kickForm').reset();loadMyKicks()}else toast(r.msg||'提交失败','error')
+});
+
+function loadAll(){loadMyTournaments();loadMyKicks()}
+function loadMyTournaments(){
+  const r=DB.myTournaments();
+  const box=$('myTourList');
+  if(r.ok&&r.tournaments.length){box.innerHTML=r.tournaments.map(t=>{
+    const d=new Date(t.createdAt);
+    return `<div class="list-item"><div class="it-title">${t.title} <span class="badge badge-${t.status}">${t.status==='active'?'进行中':t.status==='completed'?'已结束':'已取消'}</span></div>
+    <div class="it-meta">${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} | 类型:${t.gameType||'未指定'} | 人数:${t.maxPlayers}</div>
+    <div class="it-desc">输赢条件：${t.winCondition}</div>${t.description?'<div class="it-desc" style="color:var(--muted)">描述：'+t.description+'</div>':''}
+    ${t.status==='active'?'<button class="act-btn" onclick="endTour(\''+t.id+'\')">结束赛事</button>':''}
+    ${t.status==='active'?'<button class="act-btn danger" onclick="cancelTour(\''+t.id+'\')">取消赛事</button>':''}</div>`
+  }).join('')}else box.innerHTML='<div class="empty">暂无赛事</div>'
+}
+function loadMyKicks(){
+  const r=DB.myKickRequests();
+  const box=$('myKickList');
+  if(r.ok&&r.requests.length){box.innerHTML=r.requests.map(k=>{
+    const d=new Date(k.createdAt);
+    return `<div class="list-item"><div class="it-title">踢人：${k.targetUsername} <span class="badge badge-${k.status}">${k.status==='pending'?'待审核':k.status==='approved'?'已批准':'已拒绝'}</span></div>
+    <div class="it-meta">${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}</div>
+    <div class="it-desc">理由：${k.reason}</div>${k.rejectReason?'<div class="it-desc" style="color:var(--danger)">拒绝理由：'+k.rejectReason+'</div>':''}</div>`
+  }).join('')}else box.innerHTML='<div class="empty">暂无申请</div>'
+}
+window.endTour=id=>{const r=DB.updateTournament({id,status:'completed'});if(r.ok){toast('赛事已结束','success');loadMyTournaments()}else toast(r.msg,'error')};
+window.cancelTour=id=>{const r=DB.updateTournament({id,status:'cancelled'});if(r.ok){toast('赛事已取消','success');loadMyTournaments()}else toast(r.msg,'error')};
+</script>
+</body>
+</html>

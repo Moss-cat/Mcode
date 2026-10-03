@@ -1,0 +1,201 @@
+============================================================
+  编程有趣游戏赛事 + MOSS 博弈竞技场  项目说明文档
+  （由 AI 自动生成）
+============================================================
+
+一、项目概述
+------------------------------------------------------------
+本项目是一个纯前端（HTML + CSS + JavaScript）的在线编程博弈赛事平台，
+包含用户系统、管理员系统、超管系统，以及一门自定义编程语言 MOSS
+（后缀 .moss），玩家用 MOSS 编写 AI Bot 在囚徒困境博弈中对战。
+
+项目无后端依赖，数据存储在浏览器 localStorage，可直接部署到
+GitHub Pages 等静态托管平台。
+
+
+二、文件结构
+------------------------------------------------------------
+index.html        主站：登录 / 注册 / 忘记密码 / 欢迎页
+admin.html        管理员页：3 重验证 + 赛事发布 + 踢人申请
+super-admin.html  超管页：6 重验证 + 用户管理 + 审批 + 赛事管理
+app.js            localStorage 数据层（密码用摩斯编码存储）
+moss.js           MOSS 语言解释器 + 囚徒困境博弈引擎
+moss-arena.html   MOSS 博弈试玩页（代码编辑器 + 对战可视化）
+.nojekyll         GitHub Pages 直出配置（部署必需）
+
+
+三、MOSS 语言语法
+------------------------------------------------------------
+MOSS 是 Python 的变体，专为编写博弈 AI Bot 设计。
+
+【与 Python 一致】
+  - 控制流：if / elif / else、while、for ... in
+  - 函数定义：def 函数名(参数):
+  - 数据类型：list（列表）、dict（字典）、tuple（元组）
+  - 运算符：+ - * / % // ** == != < > <= >= and or not
+  - 注释：# 开头
+
+【特殊语法】
+  main()
+      程序必须定义 main() 函数，引擎每轮调用它取决策。
+
+  choose("cooperate")  或  choose("defect")
+      在 main() 内调用，做出本轮选择。
+      参数必须是 "cooperate" 或 "defect"。
+
+  win（只读变量）
+      上一局是否赢（bool）。第一轮为 False。
+
+  round（只读变量）
+      当前轮数（从 0 开始）。
+
+  history（只读列表）
+      自己每轮的决策历史。
+
+  opponent_history（只读列表）
+      对手每轮的决策历史（1v1 模式）。
+
+  delay(秒)
+      延迟函数，用于模拟思考时间，不影响实际决策。
+
+  run "事件名" when 条件:
+      事件钩子，条件成立时执行后续代码块。
+      例：run "on_loss" when not win:  print("上局输了")
+
+
+四、内置函数
+------------------------------------------------------------
+数学/类型
+  int(x)        转整数
+  float(x)      转浮点数
+  str(x)        转字符串
+  bool(x)       转布尔
+  rround(x, n)  四舍五入（n 可选，保留小数位数）
+  abs(x)        绝对值
+  min(a, b, ...)  最小值
+  max(a, b, ...)  最大值
+  sum(list)     求和
+
+序列
+  len(x)        长度
+  range(start, stop, step)  整数范围
+  list(x)       转列表
+  dict(x)       转字典
+  tuple(x)      转元组
+  sorted(list)  排序
+  enumerate(list)  枚举 (索引, 值)
+  zip(a, b, ...)    打包
+
+随机
+  random()      返回 0~1 浮点数
+  randint(a, b) 返回 a~b 整数（含两端）
+  choice(list)  从列表随机取一个
+
+输出
+  print(...)    打印到日志
+
+
+五、对象方法
+------------------------------------------------------------
+字符串：.upper() .lower() .strip() .split(sep) .join(list)
+        .replace(a, b) .startswith(s) .endswith(s)
+        .find(s) .count(s) .format(...) .isdigit() 等
+
+列表：  .append(x) .pop() .extend(list) .insert(i, x)
+        .remove(x) .index(x) .count(x) .sort()
+        .reverse() .copy() .clear()
+
+字典：  .keys() .values() .items() .get(k, default)
+        .pop(k) .update(dict) .copy() .clear()
+
+元组：  .count(x) .index(x)
+
+
+六、囚徒困境计分规则
+------------------------------------------------------------
+标准囚徒困境（PD）计分矩阵：
+
+              对手合作    对手背叛
+  我合作       +3 (R)      +0 (S)
+  我背叛       +5 (T)      +1 (P)
+
+  T = 5  背叛对方合作（诱惑）
+  R = 3  双方合作（奖励）
+  P = 1  双方背叛（惩罚）
+  S = 0  合作被背叛（ sucker 收益）
+
+多轮累计积分，积分最高者胜。
+
+
+七、使用方法
+------------------------------------------------------------
+【本地运行】
+  在项目目录启动任意静态服务器，例如：
+    python -m http.server 8000
+  然后浏览器打开：
+    http://localhost:8000/moss-arena.html   ← MOSS 博弈竞技场
+    http://localhost:8000/                   ← 主站（登录/注册）
+
+【MOSS 竞技场】
+  1. 左侧代码编辑器可加载 6 个示例 Bot：
+     - tit-for-tat    一报还一报（经典强策略）
+     - always-cooperate  永远合作
+     - always-defect     永远背叛
+     - random         随机
+     - grim-trigger   冷酷触发（被背叛一次后永远背叛）
+     - pavlov         赢存输改
+  2. 右侧选择对手 / 轮数，点击「开始对战」
+  3. 支持 1v1 对决 和 多人混战（round-robin）两种模式
+
+【编写自己的 Bot】
+  在编辑器中写 MOSS 代码，必须包含 main() 并调用 choose()。
+  示例（tit-for-tat）：
+      def main():
+          if len(opponent_history) == 0:
+              choose("cooperate")
+          else:
+              choose(opponent_history[-1])
+
+
+八、账号系统
+------------------------------------------------------------
+【超管（硬编码，首次加载生效）】
+  用户名：  MoSS
+  密码A：   M-Cat@1012
+  密码B：   MOSCATO
+  邮箱A：   moscatolin@qq.com
+  邮箱B：   jlin100@huitongschool.cn
+  登录需 6 重验证：用户名 + 密码A + 密码B + 邮箱A + 邮箱B + 邮箱验证码
+  （验证码在页面内 toast 显示，无需真实邮箱）
+
+【管理员】
+  普通用户登录后可在主站申请成为管理员，需填写密码A、密码B、申请理由。
+  超管审批后，系统为该管理员生成专属随机口令（格式 GAME-XXXX-XXXXXX）。
+  管理员登录需 3 重验证。
+
+【密码存储】
+  密码采用摩斯编码存储：
+    字符 → 标准摩斯码 → "." 替换为 "-"，"-" 替换为 "=" → 各字符用 "|" 分隔
+  对用户透明，正常输入明文密码即可。
+
+
+九、部署到 GitHub Pages
+------------------------------------------------------------
+1. 将所有文件推送到 GitHub 仓库
+2. 仓库 Settings → Pages → Source 选 main 分支
+3. 等待部署完成，访问 https://用户名.github.io/仓库名/
+4. .nojekyll 文件确保静态资源（含 .html/.js）正常直出
+
+
+十、安全沙盒
+------------------------------------------------------------
+MOSS 解释器内置沙盒限制：
+  - 无 import / open / eval / exec
+  - 单轮最大执行步数 100,000（防死循环）
+  - 最大递归深度 200
+  - win / round / history / opponent_history 为只读变量，禁止赋值
+  - 编译错误或运行时错误时，本轮默认 choose("defect")
+
+============================================================
+  文档结束
+============================================================
