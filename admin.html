@@ -124,10 +124,56 @@
         <h3>发布新赛事</h3>
         <form id="tourForm" autocomplete="off">
           <div class="field"><label class="label">赛事名称 <span class="req">*</span></label><input class="input" id="tourTitle" placeholder="如：秋季编程挑战赛" required /></div>
-          <div class="field"><label class="label">游戏类型</label><input class="input" id="tourGameType" placeholder="如：算法竞赛 / 小游戏对战" /></div>
+          <div class="field"><label class="label">游戏类型</label><input class="input" id="tourGameType" placeholder="如：MOSS 石头剪刀布、MOSS 囚徒困境..." /></div>
           <div class="field"><label class="label">赛事描述</label><textarea class="input" id="tourDesc" placeholder="规则简介..."></textarea></div>
-          <div class="field"><label class="label">输赢判断条件 <span class="req">*</span></label><textarea class="input" id="tourWin" placeholder="自行编写输赢判断逻辑，如：得分最高者胜 / 先完成3关者胜 / 最后存活者胜。bug导致比赛无法运行后果自行承担。" style="min-height:100px;"></textarea></div>
+          <div class="field"><label class="label">输赢判断条件 <span class="req">*</span></label><textarea class="input" id="tourWin" placeholder="自行编写输赢判断逻辑，如：积分最高者胜。bug导致比赛无法运行后果自行承担。" style="min-height:80px;"></textarea></div>
           <div class="field"><label class="label">最大参赛人数</label><input class="input" id="tourMax" type="number" value="8" min="2" /></div>
+
+          <!-- MOSS 博弈规则 -->
+          <div style="margin-top:18px;padding:14px;background:rgba(88,166,255,0.06);border:1px solid rgba(88,166,255,0.2);border-radius:10px;">
+            <div style="font-size:14px;font-weight:600;color:var(--accent);margin-bottom:12px;">⚙ MOSS 博弈规则</div>
+
+            <div class="field" style="margin-bottom:12px;">
+              <label class="label">对战模式</label>
+              <select class="input" id="mossMode">
+                <option value="elimination" selected>单败淘汰（随机配对，淘汰输的一半）</option>
+                <option value="round-robin">循环赛（每两个 Bot 都对战）</option>
+                <option value="1v1">1v1 随机匹配（两两对战）</option>
+              </select>
+            </div>
+
+            <div class="field" style="margin-bottom:12px;">
+              <label class="label">每对对战轮数 <span class="req">*</span></label>
+              <input class="input" id="mossRounds" type="number" value="100" min="1" max="5000" />
+            </div>
+          </div>
+
+          <!-- 裁判代码（隐藏，玩家不可见） -->
+          <div style="margin-top:18px;padding:14px;background:rgba(248,81,73,0.06);border:1px solid rgba(248,81,73,0.25);border-radius:10px;">
+            <div style="font-size:14px;font-weight:600;color:var(--danger);margin-bottom:6px;">⚖ 裁判代码（仅管理员可见，玩家不可见）</div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+              赛后自动执行，可用特殊变量 <code class="mono">P1</code>、<code class="mono">P2</code>（dict：name/score/choices）。设置 <code class="mono">winner="P1"</code> 或 <code class="mono">winner="P2"</code> 裁定胜者，也可设置 <code class="mono">P1["score"]</code>/<code class="mono">P2["score"]</code>。留空则为平局。
+            </div>
+            <textarea class="input mono" id="judgeCode" placeholder='// 示例：石头剪刀布裁判
+sa = 0
+sb = 0
+for i in range(len(P1["choices"])):
+    a = P1["choices"][i]
+    b = P2["choices"][i]
+    if a == b:
+        continue
+    elif (a == "rock" and b == "scissors") or (a == "scissors" and b == "paper") or (a == "paper" and b == "rock"):
+        sa = sa + 1
+    else:
+        sb = sb + 1
+P1["score"] = sa
+P2["score"] = sb
+if sa > sb:
+    winner = "P1"
+elif sb > sa:
+    winner = "P2"' style="min-height:120px;font-family:monospace;"></textarea>
+          </div>
+
           <button class="primary-btn" type="submit">发布赛事</button>
         </form>
       </div>
@@ -189,7 +235,10 @@ $('tourForm').addEventListener('submit',e=>{
   const r=DB.publishTournament({
     title:$('tourTitle').value.trim(),gameType:$('tourGameType').value.trim(),
     description:$('tourDesc').value.trim(),winCondition:$('tourWin').value.trim(),
-    maxPlayers:parseInt($('tourMax').value)||8
+    maxPlayers:parseInt($('tourMax').value)||8,
+    mossRounds:parseInt($('mossRounds').value)||100,
+    mossMode:$('mossMode').value,
+    judgeCode:$('judgeCode').value.trim(),
   });
   if(r.ok){toast('赛事已发布','success');$('tourForm').reset();loadMyTournaments()}else toast(r.msg||'发布失败','error')
 });
@@ -207,10 +256,13 @@ function loadMyTournaments(){
   const box=$('myTourList');
   if(r.ok&&r.tournaments.length){box.innerHTML=r.tournaments.map(t=>{
     const d=new Date(t.createdAt);
-    return `<div class="list-item"><div class="it-title">${t.title} <span class="badge badge-${t.status}">${t.status==='active'?'进行中':t.status==='completed'?'已结束':'已取消'}</span></div>
+    const botCount = (t.mossBots||[]).length;
+    return `<div class="list-item"><div class="it-title">${t.title} <span class="badge badge-${t.status}">${t.status==='active'?'报名中':t.status==='running'?'比赛中':t.status==='completed'?'已结束':'已取消'}</span></div>
     <div class="it-meta">${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} | 类型:${t.gameType||'未指定'} | 人数:${t.maxPlayers}</div>
-    <div class="it-desc">输赢条件：${t.winCondition}</div>${t.description?'<div class="it-desc" style="color:var(--muted)">描述：'+t.description+'</div>':''}
-    ${t.status==='active'?'<button class="act-btn" onclick="endTour(\''+t.id+'\')">结束赛事</button>':''}
+    <div class="it-desc">输赢条件：${t.winCondition}</div>
+    <div class="it-desc" style="color:var(--accent)">⚙ 规则：${t.mossMode==='round-robin'?'循环赛':t.mossMode==='elimination'?'单败淘汰':'1v1随机匹配'} | ${t.mossRounds||100}轮 | 已报名 Bot: ${botCount}</div>
+    ${t.status==='active'&&botCount>=2?'<button class="act-btn success" onclick="startTour(\''+t.id+'\')">▶ 开始比赛</button>':''}
+    ${t.status==='active'?'<button class="act-btn" onclick="endTour(\''+t.id+'\')">结束报名</button>':''}
     ${t.status==='active'?'<button class="act-btn danger" onclick="cancelTour(\''+t.id+'\')">取消赛事</button>':''}</div>`
   }).join('')}else box.innerHTML='<div class="empty">暂无赛事</div>'
 }
@@ -226,6 +278,16 @@ function loadMyKicks(){
 }
 window.endTour=id=>{const r=DB.updateTournament({id,status:'completed'});if(r.ok){toast('赛事已结束','success');loadMyTournaments()}else toast(r.msg,'error')};
 window.cancelTour=id=>{const r=DB.updateTournament({id,status:'cancelled'});if(r.ok){toast('赛事已取消','success');loadMyTournaments()}else toast(r.msg,'error')};
+window.startTour=id=>{
+  if(!confirm('开始比赛后将随机匹配所有已提交的 Bot 并按规则对战，确定开始？'))return;
+  const r=DB.runTournament(id);
+  if(r.ok){
+    toast('比赛已开始！共 '+r.botCount+' 个 Bot 参赛','success');
+    loadMyTournaments();
+    // 跳转到比赛页
+    setTimeout(()=>{ window.open('moss-tournament.html?id='+id,'_blank'); }, 500);
+  }else toast(r.msg,'error')
+};
 </script>
 </body>
 </html>

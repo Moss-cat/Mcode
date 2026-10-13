@@ -1,7 +1,9 @@
 /**
- * moss.js — MOSS 语言解释器 + 囚徒困境博弈引擎
+ * moss.js — MOSS 语言解释器 + 通用博弈引擎
  *
  * MOSS 是 Python 的变体，专为编写博弈 AI bot 设计。
+ * 语言本身不绑定任何具体游戏（囚徒困境、石头剪刀布、赌博等均可）。
+ * 游戏规则由「裁判代码」定义，bot 只负责用 choose() 做出决策。
  * 支持：if/elif/else、while、for...in、def、list/dict/tuple、内置函数与方法
  * 特殊语法：main()（必有）、choose()、win（只读）、delay()、run...when（事件钩子）
  *
@@ -10,9 +12,9 @@
  * 用法：
  *   const bot = new MOSS.Bot('myBot', sourceCode);
  *   const choice = bot.decide({ win: false, round: 3, history: [...] });
- *   // choice === 'cooperate' | 'defect' | null（默认 defect）
+ *   // choice 是 bot 通过 choose() 传出的任意值
  *
- *   const arena = new MOSS.Arena({ rounds: 200, mode: '1v1' | 'round-robin' });
+ *   const arena = new MOSS.Arena({ rounds: 200, mode: '1v1' | 'round-robin' | 'elimination', judgeCode });
  *   arena.addBot('bot1', code1);
  *   arena.addBot('bot2', code2);
  *   const result = arena.runMatch();
@@ -44,7 +46,7 @@
     for (let lineNum = 0; lineNum < lines.length; lineNum++) {
       let line = lines[lineNum];
 
-      // 注释剥离（# 开头或行中 #，但要避开字符串内 #）
+      // 注释剥离（// 开头或行中 //，但要避开字符串内的 //）
       if (parenDepth === 0) {
         line = stripComment(line);
       }
@@ -85,6 +87,9 @@
       while (j < line.length) {
         const ch = line[j];
         if (ch === ' ' || ch === '\t') { j++; continue; }
+
+        // // 单行注释
+        if (ch === '/' && line[j + 1] === '/') break;
 
         // 数字字面量（含 .5 浮点）
         if (/[0-9]/.test(ch) || (ch === '.' && /[0-9]/.test(line[j + 1] || ''))) {
@@ -168,7 +173,7 @@
         }
 
         // 单字符运算符 / 分隔符
-        if ('+-*/%=<>(),:.[]!'.includes(ch)) {
+        if ('+-*/%=<>(),:.[]!{}'.includes(ch)) {
           if (ch === '(' || ch === '[' || ch === '{') parenDepth++;
           if (ch === ')' || ch === ']' || ch === '}') parenDepth = Math.max(0, parenDepth - 1);
           tokens.push({ type: 'OP', value: ch, line: lineNum + 1 });
@@ -203,7 +208,7 @@
         if (ch === quote) inStr = false;
       } else {
         if (ch === '"' || ch === "'") { inStr = true; quote = ch; }
-        else if (ch === '#') return line.slice(0, i);
+        else if (ch === '/' && line[i + 1] === '/') return line.slice(0, i);
       }
     }
     return line;
@@ -380,6 +385,10 @@
         const op = this.next().value;
         const value = this.expr();
         this.match('NEWLINE');
+        // 特殊语法：main()="name" 设置 bot 标识名
+        if (op === '=' && expr.type === 'Call' && expr.func.type === 'Name' && expr.func.id === 'main') {
+          return { type: 'SetMainName', name: value };
+        }
         if (op === '=') return { type: 'Assign', target: expr, value };
         return { type: 'AugAssign', op, target: expr, value };
       }
@@ -464,17 +473,28 @@
 
     comparison() {
       let left = this.arith();
-      while (this.peek().type === 'OP' &&
-        ['==', '!=', '<', '>', '<=', '>='].includes(this.peek().value) ||
-        (this.peek().type === 'KEYWORD' && (this.peek().value === 'in' || this.peek().value === 'is'))) {
-
-        let op = this.next().value;
+      while (
+        (this.peek().type === 'OP' && ['==', '!=', '<', '>', '<=', '>='].includes(this.peek().value)) ||
+        (this.peek().type === 'KEYWORD' && (this.peek().value === 'in' || this.peek().value === 'is')) ||
+        (this.peek().type === 'KEYWORD' && this.peek().value === 'not' &&
+         this.peek(1).type === 'KEYWORD' && (this.peek(1).value === 'in' || this.peek(1).value === 'is'))
+      ) {
         let isNot = false;
-        if (this.peek().type === 'KEYWORD' && this.peek().value === 'not') {
-          // not in
-          this.pos++;
+        let op;
+        if (this.peek().value === 'not') {
+          // not in / is not（这里 not 在前）
+          this.pos++; // 跳过 not
+          op = this.next().value; // in 或 is
           isNot = true;
-          op = 'not in';
+          op = 'not ' + op;
+        } else {
+          op = this.next().value;
+          if (this.peek().type === 'KEYWORD' && this.peek().value === 'not') {
+            // is not
+            this.pos++;
+            isNot = true;
+            op = op + ' not';
+          }
         }
         const right = this.arith();
         left = { type: 'Compare', op, left, right };
@@ -680,8 +700,14 @@
       this.maxSteps = 100000;
       this.maxDepth = 200;
       this.depth = 0;
+      this.playStack = []; // play() 内部的临时 Bot 上下文栈
 
       this._setupBuiltins();
+    }
+
+    // 获取当前生效的 Bot 上下文（play 内部优先）
+    _currentCtx() {
+      return this.playStack.length > 0 ? this.playStack[this.playStack.length - 1] : this.botApi;
     }
 
     _setupBuiltins() {
@@ -710,7 +736,7 @@
 
       g.set('print', makeBuiltin((...args) => {
         const s = args.map(a => pyRepr(a)).join(' ');
-        this.botApi.log(s);
+        this._currentCtx().log(s);
         return null;
       }));
 
@@ -804,7 +830,14 @@
       }));
 
       // 随机数函数（沙盒内用 Math.random，不可预测但足够博弈用）
-      g.set('random', makeBuiltin(() => Math.random()));
+      g.set('random', makeBuiltin((a, b) => {
+        // random() -> 0~1 浮点；random(a, b) -> a~b 整数
+        if (a === undefined) return Math.random();
+        const lo = Math.ceil(Number(a));
+        const hi = Math.floor(Number(b));
+        if (lo > hi) throw new MOSSRuntimeError('ValueError: random(a, b) 要求 a <= b');
+        return Math.floor(Math.random() * (hi - lo + 1)) + lo;
+      }));
       g.set('randint', makeBuiltin((a, b) => {
         const lo = Math.ceil(Number(a));
         const hi = Math.floor(Number(b));
@@ -814,6 +847,49 @@
       g.set('choice', makeBuiltin((arr) => {
         if (!Array.isArray(arr) || arr.length === 0) throw new MOSSRuntimeError('ValueError: choice() 参数必须是非空列表');
         return arr[Math.floor(Math.random() * arr.length)];
+      }));
+
+      // play(botA, botB, rounds): 在代码内部让两个策略函数对战，返回每轮记录
+      // 语言本身不做计分，只收集双方每轮的 choose() 输出
+      g.set('play', makeBuiltin((fnA, fnB, rounds) => {
+        rounds = Math.max(1, parseInt(rounds) || 100);
+        const nameA = typeof fnA === 'string' ? fnA : (fnA && fnA.__userfn ? fnA.def.name : String(fnA));
+        const nameB = typeof fnB === 'string' ? fnB : (fnB && fnB.__userfn ? fnB.def.name : String(fnB));
+
+        if (!this.functions[nameA]) throw new MOSSRuntimeError(`NameError: 函数 '${nameA}' 未定义`);
+        if (!this.functions[nameB]) throw new MOSSRuntimeError(`NameError: 函数 '${nameB}' 未定义`);
+
+        const makeState = () => ({ history: [], oppHistory: [], win: false, round: 0, choice: null, logs: [] });
+        const stateA = makeState(), stateB = makeState();
+        const makeCtx = (s) => ({
+          getWin: () => s.win, getRound: () => s.round,
+          getHistory: () => s.history, getOpponentHistory: () => s.oppHistory,
+          choose: (opt) => { s.choice = opt; },
+          delay: () => {}, log: (msg) => s.logs.push(msg),
+        });
+
+        const roundRecords = []; // 每轮 [choiceA, choiceB]
+        for (let r = 0; r < rounds; r++) {
+          stateA.round = r; stateB.round = r;
+          stateA.choice = null; stateB.choice = null;
+
+          this.playStack.push(makeCtx(stateA));
+          try { this._callFunction(nameA, [], this.globals); } catch (e) { if (!(e instanceof FlowSignal)) stateA.logs.push('错误: ' + (e.message || e)); }
+          this.playStack.pop();
+
+          this.playStack.push(makeCtx(stateB));
+          try { this._callFunction(nameB, [], this.globals); } catch (e) { if (!(e instanceof FlowSignal)) stateB.logs.push('错误: ' + (e.message || e)); }
+          this.playStack.pop();
+
+          const ca = stateA.choice;
+          const cb = stateB.choice;
+          stateA.history.push(ca); stateA.oppHistory.push(cb);
+          stateB.history.push(cb); stateB.oppHistory.push(ca);
+          roundRecords.push([ca, cb]);
+        }
+
+        // 返回 PlayResult 对象（不含计分，计分由裁判代码决定）
+        return new PlayResult(nameA, nameB, roundRecords);
       }));
 
       // 注入只读变量 win（在 decide 时再覆盖）
@@ -850,7 +926,8 @@
       }
     }
 
-    // 执行 main() 取决策
+    // 执行决策函数取本轮选择
+    // 新规范：main() 必须设置 final_choose="策略函数名"，引擎再调用该策略
     decide() {
       // 评估事件钩子
       for (const hook of this.eventHooks) {
@@ -864,12 +941,50 @@
         }
       }
 
-      // 调用 main()
+      // main() 必须存在
       if (!this.functions['main']) {
-        throw new MOSSRuntimeError('NameError: 程序必须定义 main() 函数');
+        throw new MOSSRuntimeError('NameError: 必须定义 main() 函数，否则无法发布参赛');
       }
-      const result = this._callFunction('main', [], this.globals);
-      return result;
+
+      // 1. 先执行 main()，它负责设置 final_choose="策略名"
+      //    兼容旧写法：main() 也可以直接调用 choose()
+      try {
+        this._callFunction('main', [], this.globals);
+      } catch (e) {
+        // choose/return 信号正常结束，继续
+        if (!(e instanceof FlowSignal)) throw e;
+      }
+
+      // 兼容旧语法：如果 main() 已经直接调用了 choose()，直接采用
+      if (this.botApi && this.botApi.choice !== null && this.botApi.choice !== undefined) {
+        return this.botApi.choice;
+      }
+
+      // 2. 读取 final_choose 变量确定参赛策略函数
+      let targetFn = null;
+      try {
+        const fc = this.globals.get('final_choose');
+        if (typeof fc === 'string' && this.functions[fc]) {
+          targetFn = fc;
+        }
+      } catch (e) { /* final_choose 未定义 */ }
+
+      // 兼容旧语法 bot="函数名"（顶层赋值）
+      if (!targetFn) {
+        try {
+          const botVar = this.globals.get('bot');
+          if (typeof botVar === 'string' && this.functions[botVar]) {
+            targetFn = botVar;
+          }
+        } catch (e) { /* bot 变量未定义 */ }
+      }
+
+      if (!targetFn) {
+        throw new MOSSRuntimeError('RuntimeError: main() 中必须设置 final_choose="策略函数名"（且该函数已定义）');
+      }
+
+      // 3. 调用实际策略函数，由它调用 choose() 做出决策
+      return this._callFunction(targetFn, [], this.globals);
     }
 
     _callFunction(name, args, callerScope) {
@@ -890,9 +1005,9 @@
       try {
         for (const stmt of fn.body) {
           const sig = this._execStatement(stmt, local);
-          if (sig instanceof FlowSignal && sig.type === 'return') {
-            result = sig.value;
-            break;
+          if (sig instanceof FlowSignal) {
+            if (sig.type === 'return') { result = sig.value; break; }
+            if (sig.type === 'choose') { result = sig.value; break; }
           }
         }
       } finally {
@@ -921,8 +1036,7 @@
         case 'Continue': return new FlowSignal('continue');
 
         case 'Expr':
-          this._evalExpr(node.value, scope);
-          return null;
+          return this._evalExpr(node.value, scope);
 
         case 'Assign': {
           const val = this._evalExpr(node.value, scope);
@@ -958,7 +1072,7 @@
             if (sig instanceof FlowSignal) {
               if (sig.type === 'break') break;
               if (sig.type === 'continue') continue;
-              if (sig.type === 'return') return sig;
+              return sig; // return / choose 都向上传递
             }
           }
           return null;
@@ -973,7 +1087,7 @@
             if (sig instanceof FlowSignal) {
               if (sig.type === 'break') break;
               if (sig.type === 'continue') continue;
-              if (sig.type === 'return') return sig;
+              return sig; // return / choose 都向上传递
             }
           }
           return null;
@@ -990,6 +1104,13 @@
           return null;
         }
 
+        case 'SetMainName': {
+          // main()="name" 设置 bot 标识名
+          this.mainName = this._evalExpr(node.name, scope);
+          this.globals.set('__main_name__', this.mainName);
+          return null;
+        }
+
         default:
           throw new MOSSRuntimeError(`RuntimeError: 未知语句类型 ${node.type}`);
       }
@@ -1000,6 +1121,12 @@
         // 只读变量保护
         if (target.id === 'win' || target.id === 'round' || target.id === 'history' || target.id === 'opponent_history') {
           throw new MOSSRuntimeError(`PermissionError: '${target.id}' 是只读变量，不能赋值`);
+        }
+        // final_choose 是参赛策略选择器，始终写入全局作用域
+        // 这样 main() 内设置的 final_choose 能被引擎读取
+        if (target.id === 'final_choose') {
+          this.globals.set(target.id, val);
+          return;
         }
         scope.set(target.id, val);
       } else if (target.type === 'Index') {
@@ -1034,12 +1161,17 @@
         case 'None': return null;
 
         case 'Name': {
-          if (node.id === 'win') return this.botApi.getWin();
-          if (node.id === 'round') return this.botApi.getRound();
-          if (node.id === 'history') return this.botApi.getHistory();
-          if (node.id === 'opponent_history') return this.botApi.getOpponentHistory();
-          if (node.id === 'delay') return { __builtin: true, fn: (s) => { this.botApi.delay(s); return null; } };
-          if (node.id === 'choose') return { __builtin: true, fn: (opt) => { this.botApi.choose(opt); return null; } };
+          if (node.id === 'win') return this._currentCtx().getWin();
+          if (node.id === 'round') return this._currentCtx().getRound();
+          if (node.id === 'history') return this._currentCtx().getHistory();
+          if (node.id === 'opponent_history') return this._currentCtx().getOpponentHistory();
+          if (node.id === 'delay') return { __builtin: true, fn: (s) => { this._currentCtx().delay(s); return null; } };
+          if (node.id === 'choose') return { __builtin: true, fn: (opt) => {
+            // choose() 接受任意值，原样传给裁判
+            this._currentCtx().choose(opt);
+            // choose 相当于 return：抛出信号结束当前函数
+            throw new FlowSignal('choose', opt);
+          }};
           return scope.get(node.id);
         }
 
@@ -1190,6 +1322,22 @@
   }
 
   // ============================================================
+  //  PlayResult：play() 返回的对战结果
+  // ============================================================
+  class PlayResult {
+    constructor(nameA, nameB, rounds) {
+      this.nameA = nameA;
+      this.nameB = nameB;
+      this.rounds = rounds;       // [[choiceA, choiceB], ...]
+    }
+    // print 时显示每轮记录
+    toString() {
+      const lines = this.rounds.map(r => `${r[0]} ${r[1]}`);
+      return lines.join('\n');
+    }
+  }
+
+  // ============================================================
   //  辅助类型与函数
   // ============================================================
 
@@ -1248,6 +1396,7 @@
     if (Array.isArray(v)) return '[' + v.map(pyReprElem).join(', ') + ']';
     if (v instanceof MossTuple) return '(' + v.items.map(pyReprElem).join(', ') + (v.items.length === 1 ? ',' : '') + ')';
     if (v instanceof MossDict) return '{' + v.itemsArray().map(kv => pyReprElem(kv[0]) + ': ' + pyReprElem(kv[1])).join(', ') + '}';
+    if (v instanceof PlayResult) return v.toString();
     if (v && v.__builtin) return '<built-in function>';
     if (v && v.__userfn) return '<function>';
     return String(v);
@@ -1318,6 +1467,7 @@
       case 'in': return pyContains(r, l);
       case 'not in': return !pyContains(r, l);
       case 'is': return l === r;
+      case 'is not': return l !== r;
       default: throw new MOSSRuntimeError(`RuntimeError: 未知比较 ${op}`);
     }
   }
@@ -1449,6 +1599,10 @@
       };
       if (methods[attr]) return { __builtin: true, fn: methods[attr] };
     }
+    if (obj instanceof PlayResult) {
+      // play() 返回的对战结果对象：直接返回属性值
+      if (attr in obj) return obj[attr];
+    }
     throw new MOSSRuntimeError(`AttributeError: 对象没有属性 '${attr}'`);
   }
 
@@ -1491,15 +1645,15 @@
       }
     }
 
-    // 引擎每轮调用，返回 'cooperate' / 'defect'
+    // 引擎每轮调用，返回 bot 通过 choose() 传出的值（无则 null）
     decide(ctx) {
       if (this.compileError) {
         this.error = this.compileError;
-        return 'defect';
+        return null;
       }
       if (!this.ast) {
         this.error = 'AST 未生成';
-        return 'defect';
+        return null;
       }
 
       // 每轮创建新解释器，但保留编译好的 AST
@@ -1511,10 +1665,7 @@
         choice: null,
         logs: [],
         choose(opt) {
-          if (opt !== 'cooperate' && opt !== 'defect') {
-            this.logs.push(`ValueError: choose() 只接受 'cooperate' 或 'defect'，实际收到 '${opt}'`);
-            return;
-          }
+          // 接受任意值，原样记录
           this.choice = opt;
         },
         delay(s) { /* 思考时间，实际不影响决策 */ },
@@ -1536,16 +1687,20 @@
           this.error = 'TimeoutWarning: main() 执行时间过长';
         }
       } catch (e) {
-        this.error = e.message || String(e);
-        api.logs.push('运行时错误: ' + this.error);
-        this.logs = api.logs;
-        return 'defect';
+        // FlowSignal（choose/return）是正常控制流，不是错误
+        if (e && e.constructor && e.constructor.name === 'FlowSignal') {
+          // 正常结束，choice 已被 api.choose 记录
+        } else {
+          this.error = e.message || String(e);
+          api.logs.push('运行时错误: ' + this.error);
+          this.logs = api.logs;
+          return null;
+        }
       }
 
       this.logs = api.logs;
       this.error = null;
-      const choice = api.choice !== null ? api.choice : 'defect';
-      return choice;
+      return api.choice;
     }
 
     recordRound(choice, oppChoice) {
@@ -1555,25 +1710,20 @@
   }
 
   // ============================================================
-  //  Arena（囚徒困境博弈引擎）
+  //  Arena（通用博弈引擎）
   // ============================================================
-
-  // 计分矩阵
-  const PD_SCORE = {
-    'CC': 3, // R - 双方合作
-    'DD': 1, // P - 双方背叛
-    'CD': 0, // S - 合作被背叛
-    'DC': 5, // T - 背叛对方合作
-  };
 
   class Arena {
     constructor(config = {}) {
       this.rounds = config.rounds || 200;
-      this.mode = config.mode || '1v1'; // '1v1' | 'round-robin'
+      this.mode = config.mode || '1v1'; // '1v1' | 'round-robin' | 'elimination'
       this.bots = [];
       this.verbose = config.verbose !== false;
       this.onRound = config.onRound || null;
       this.onMatchEnd = config.onMatchEnd || null;
+      this.onRoundEnd = config.onRoundEnd || null; // 淘汰赛每轮结束回调
+      // 裁判代码（MOSS），赛后用 P1/P2 裁定胜者与得分
+      this.judgeCode = config.judgeCode || '';
     }
 
     addBot(name, source) {
@@ -1582,14 +1732,7 @@
       return bot;
     }
 
-    // 计算单轮得分
-    score(choiceA, choiceB) {
-      const a = choiceA[0].toUpperCase();
-      const b = choiceB[0].toUpperCase();
-      return { a: PD_SCORE[a + b], b: PD_SCORE[b + a] };
-    }
-
-    // 1v1 单场比赛
+    // 1v1 单场比赛：运行 N 轮收集双方选择，由裁判代码裁定胜者
     run1v1(botA, botB) {
       const rounds = [];
       botA.history = [];
@@ -1597,11 +1740,9 @@
       botB.history = [];
       botB.oppHistory = [];
 
-      let scoreA = 0, scoreB = 0;
-
       for (let r = 0; r < this.rounds; r++) {
-        const ctxA = { win: r > 0 ? (rounds[r - 1].a > rounds[r - 1].b) : false, round: r };
-        const ctxB = { win: r > 0 ? (rounds[r - 1].b > rounds[r - 1].a) : false, round: r };
+        const ctxA = { win: r > 0 ? rounds[r - 1].a.score > rounds[r - 1].b.score : false, round: r };
+        const ctxB = { win: r > 0 ? rounds[r - 1].b.score > rounds[r - 1].a.score : false, round: r };
 
         const choiceA = botA.decide(ctxA);
         const choiceB = botB.decide(ctxB);
@@ -1609,23 +1750,59 @@
         botA.recordRound(choiceA, choiceB);
         botB.recordRound(choiceB, choiceA);
 
-        const s = this.score(choiceA, choiceB);
-        scoreA += s.a;
-        scoreB += s.b;
-
         rounds.push({
           round: r,
-          a: { name: botA.name, choice: choiceA, score: s.a, total: scoreA },
-          b: { name: botB.name, choice: choiceB, score: s.b, total: scoreB },
+          a: { name: botA.name, choice: choiceA, score: 0 },
+          b: { name: botB.name, choice: choiceB, score: 0 },
         });
 
         if (this.onRound) this.onRound(rounds[r]);
       }
 
+      // 构建 P1/P2 供裁判使用
+      const choicesA = rounds.map(r => r.a.choice);
+      const choicesB = rounds.map(r => r.b.choice);
+      const p1 = new MossDict();
+      p1.set('name', botA.name);
+      p1.set('score', 0);
+      p1.set('choices', choicesA);
+      const p2 = new MossDict();
+      p2.set('name', botB.name);
+      p2.set('score', 0);
+      p2.set('choices', choicesB);
+
+      let winner = 'tie';
+      let scoreA = 0, scoreB = 0;
+
+      // 执行裁判代码
+      if (this.judgeCode) {
+        try {
+          const tokens = tokenize(this.judgeCode);
+          const ast = new Parser(tokens).parse();
+          const interp = new Interpreter(ast, {
+            choose(){}, log(){}, delay(){},
+            win:false, round:0, history:[], oppHistory:[],
+            getWin(){return false}, getRound(){return 0}, getHistory(){return []}, getOpponentHistory(){return []},
+          });
+          interp.globals.set('P1', p1);
+          interp.globals.set('P2', p2);
+          interp.run();
+          const w = interp.globals.get('winner');
+          if (w === 'P1' || w === botA.name) winner = botA.name;
+          else if (w === 'P2' || w === botB.name) winner = botB.name;
+          else winner = 'tie';
+          // 裁判可通过 P1["score"]/P2["score"] 设置得分
+          scoreA = p1.get('score') || 0;
+          scoreB = p2.get('score') || 0;
+        } catch (e) {
+          // 裁判代码出错时回退
+        }
+      }
+
       const result = {
         botA: botA.name, botB: botB.name,
         scoreA, scoreB,
-        winner: scoreA > scoreB ? botA.name : (scoreB > scoreA ? botB.name : 'tie'),
+        winner,
         rounds,
       };
 
@@ -1633,32 +1810,104 @@
       return result;
     }
 
-    // round-robin：每对 bot 两两对战，累计积分
+    // 单败淘汰赛：随机配对，每人对打一次，淘汰输的一半，奇数再踢最低分
+    runElimination() {
+      let remaining = [...this.bots];
+      const allRounds = [];
+
+      while (remaining.length > 1) {
+        // 随机洗牌
+        for (let i = remaining.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+        }
+
+        const roundMatches = [];
+        const winners = [];
+        const matchScore = {}; // name -> match score
+
+        let i = 0;
+        while (i < remaining.length - 1) {
+          const a = remaining[i], b = remaining[i + 1];
+          const r = this.run1v1(a, b);
+          roundMatches.push(r);
+          matchScore[a.name] = r.scoreA;
+          matchScore[b.name] = r.scoreB;
+          const w = r.winner === 'tie' ? (r.scoreA >= r.scoreB ? a : b)
+                    : (r.winner === a.name ? a : b);
+          winners.push(w);
+          i += 2;
+        }
+
+        // 奇数：最后一个轮空直接晋级
+        if (remaining.length % 2 === 1) {
+          const bye = remaining[remaining.length - 1];
+          winners.push(bye);
+          matchScore[bye.name] = 0; // 轮空无比赛得分
+        }
+
+        // 晋级人数为奇数时，额外淘汰本场得分最低者
+        if (winners.length > 1 && winners.length % 2 === 1) {
+          let lowIdx = 0, lowScore = Infinity;
+          for (let k = 0; k < winners.length; k++) {
+            const s = matchScore[winners[k].name] ?? 0;
+            if (s < lowScore) { lowScore = s; lowIdx = k; }
+          }
+          winners.splice(lowIdx, 1);
+        }
+
+        const roundInfo = {
+          matches: roundMatches,
+          survivors: winners.map(b => b.name),
+        };
+        allRounds.push(roundInfo);
+        if (this.onRoundEnd) this.onRoundEnd(roundInfo);
+        remaining = winners;
+      }
+
+      const champion = remaining[0];
+      return {
+        mode: 'elimination',
+        champion: champion ? champion.name : null,
+        rounds: allRounds,
+      };
+    }
+
+    // round-robin：每对 bot 两两对战，按胜场排名
     runRoundRobin() {
-      const totals = {};
+      const wins = {};
+      const totalScore = {};
       const matchResults = [];
-      for (const bot of this.bots) totals[bot.name] = 0;
+      for (const bot of this.bots) { wins[bot.name] = 0; totalScore[bot.name] = 0; }
 
       for (let i = 0; i < this.bots.length; i++) {
         for (let j = i + 1; j < this.bots.length; j++) {
           const result = this.run1v1(this.bots[i], this.bots[j]);
           matchResults.push(result);
-          totals[this.bots[i].name] += result.scoreA;
-          totals[this.bots[j].name] += result.scoreB;
+          totalScore[this.bots[i].name] += result.scoreA;
+          totalScore[this.bots[j].name] += result.scoreB;
+          if (result.winner === this.bots[i].name) wins[this.bots[i].name]++;
+          else if (result.winner === this.bots[j].name) wins[this.bots[j].name]++;
         }
       }
 
-      const ranking = Object.entries(totals)
-        .map(([name, score]) => ({ name, score }))
-        .sort((a, b) => b.score - a.score);
+      const ranking = this.bots.map(b => ({
+        name: b.name,
+        wins: wins[b.name],
+        score: totalScore[b.name],
+      })).sort((a, b) => (b.wins - a.wins) || (b.score - a.score));
 
-      return { mode: 'round-robin', totals, ranking, matchResults };
+      return { mode: 'round-robin', wins, totalScore, ranking, matchResults };
     }
 
     runMatch() {
       if (this.mode === '1v1') {
         if (this.bots.length < 2) throw new Error('1v1 模式需要至少 2 个 bot');
         return this.run1v1(this.bots[0], this.bots[1]);
+      }
+      if (this.mode === 'elimination') {
+        if (this.bots.length < 2) throw new Error('淘汰赛需要至少 2 个 bot');
+        return this.runElimination();
       }
       return this.runRoundRobin();
     }
@@ -1675,7 +1924,6 @@
     Bot,
     Arena,
     Bot: Bot,
-    PD_SCORE,
     // 让用户能从控制台测试
     _internal: { MossDict, MossTuple, pyRepr, isTruthy },
   };

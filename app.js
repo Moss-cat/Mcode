@@ -318,7 +318,7 @@ const DB = (() => {
   }
 
   // 发布赛事
-  function publishTournament({ title, gameType, description, winCondition, maxPlayers }) {
+  function publishTournament({ title, gameType, description, winCondition, maxPlayers, mossRounds, mossMode, judgeCode }) {
     const s = getSession();
     if (!s) return { ok: false, msg: '请先登录' };
     if (s.role !== 'admin') return { ok: false, msg: '仅管理员可发布' };
@@ -328,6 +328,11 @@ const DB = (() => {
     const t = {
       id: uid('t'), title, gameType: gameType || '', description: description || '',
       winCondition, maxPlayers: parseInt(maxPlayers) || 8,
+      // MOSS 博弈规则
+      mossRounds: parseInt(mossRounds) || 100,
+      mossMode: mossMode || 'elimination', // 'elimination' 单败淘汰 | 'round-robin' 循环赛 | '1v1' 随机匹配
+      judgeCode: judgeCode || '', // 裁判代码（隐藏，对玩家不可见）
+      mossBots: [], // 玩家提交的 Bot: [{userId, username, name, code}]
       createdBy: s.username, createdByUserId: s.userId,
       status: 'active', cancelReason: '', createdAt: now(),
     };
@@ -353,6 +358,73 @@ const DB = (() => {
     arr[i].status = status;
     write(K.tours, arr);
     return { ok: true };
+  }
+
+  // 校验 Bot 代码是否符合参赛规范（必须有 main() 且设置 final_choose）
+  function validateBotCode(code) {
+    const M = (typeof MOSS !== 'undefined') ? MOSS : (global.MOSS);
+    if (!M || !M.Bot) return { ok: true }; // 解释器未加载时跳过强校验
+    try {
+      const bot = new M.Bot('_validate_', code);
+      if (bot.compileError) return { ok: false, msg: '编译错误: ' + bot.compileError };
+      // 试跑一轮，检查是否能正常决策
+      const choice = bot.decide({ win: false, round: 0, history: [], oppHistory: [] });
+      if (bot.error) return { ok: false, msg: '运行错误: ' + bot.error };
+      if (!choice) return { ok: false, msg: '未做出决策，请确保 main() 设置了 final_choose' };
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, msg: '校验失败: ' + (e.message || e) };
+    }
+  }
+
+  // 玩家提交 Bot 到赛事
+  function submitBot({ tournamentId, botName, botCode }) {
+    const s = getSession();
+    if (!s) return { ok: false, msg: '请先登录' };
+    if (!tournamentId) return { ok: false, msg: '赛事ID缺失' };
+    if (!botCode || !botCode.trim()) return { ok: false, msg: 'Bot 代码不能为空' };
+    // 参赛规范校验：必须有 main() 且设置 final_choose
+    const v = validateBotCode(botCode);
+    if (!v.ok) return { ok: false, msg: v.msg };
+    const arr = read(K.tours, []);
+    const i = arr.findIndex(t => t.id === tournamentId);
+    if (i < 0) return { ok: false, msg: '赛事不存在' };
+    const t = arr[i];
+    if (t.status !== 'active') return { ok: false, msg: '赛事已结束或已取消' };
+    // 检查是否已提交，已提交则覆盖
+    const bi = t.mossBots.findIndex(b => b.userId === s.userId);
+    const entry = {
+      userId: s.userId, username: s.username,
+      name: botName || s.username + '_bot',
+      code: botCode,
+      submittedAt: now(),
+    };
+    if (bi >= 0) {
+      t.mossBots[bi] = entry;
+    } else {
+      t.mossBots.push(entry);
+    }
+    arr[i] = t;
+    write(K.tours, arr);
+    return { ok: true, msg: bi >= 0 ? 'Bot 已更新' : 'Bot 已提交' };
+  }
+
+  // 管理员开始比赛（随机匹配 + 对战）
+  function runTournament(tournamentId) {
+    const s = getSession();
+    if (!s) return { ok: false, msg: '请先登录' };
+    if (s.role !== 'admin' && s.role !== 'superadmin') return { ok: false, msg: '无权限' };
+    const arr = read(K.tours, []);
+    const i = arr.findIndex(t => t.id === tournamentId);
+    if (i < 0) return { ok: false, msg: '赛事不存在' };
+    const t = arr[i];
+    if (t.createdByUserId !== s.userId && s.role !== 'superadmin') return { ok: false, msg: '无权操作' };
+    if (t.mossBots.length < 2) return { ok: false, msg: '至少需要 2 个 Bot 才能开始比赛' };
+    // 标记为进行中
+    t.status = 'running';
+    arr[i] = t;
+    write(K.tours, arr);
+    return { ok: true, msg: '比赛已开始', botCount: t.mossBots.length };
   }
 
   function kickRequest({ targetUsername, reason }) {
@@ -551,6 +623,7 @@ const DB = (() => {
     adminApply, adminApplyStatus,
     sendAdminCode, adminLogin,
     publishTournament, myTournaments, updateTournament,
+    submitBot, runTournament,
     kickRequest, myKickRequests,
     publicTournaments,
     // 超管 API

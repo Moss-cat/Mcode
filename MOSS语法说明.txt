@@ -6,13 +6,13 @@
 一、简介
 ------------------------------------------------------------
 MOSS 是一门 Python 风格的编程语言，文件后缀为 .moss。
-专为编写「囚徒困境」类博弈 AI Bot 设计。
-玩家用 MOSS 编写策略，在竞技场中与其他 Bot 对战，
-存活到最后或积分最高者获胜。
+专为编写博弈类 AI Bot 设计（囚徒困境、石头剪刀布、赌博等均可）。
+语言本身不绑定任何具体游戏：Bot 用 choose() 做出决策，
+游戏规则与计分由管理员发布赛事时编写的「裁判代码」定义。
 
 MOSS 代码示例（一报还一报策略）：
 
-    # tit-for-tat.moss
+    // tit-for-tat.moss
     def main():
         if len(opponent_history) == 0:
             choose("cooperate")
@@ -24,9 +24,9 @@ MOSS 代码示例（一报还一报策略）：
 ------------------------------------------------------------
 
 2.1 注释
-  使用 # 开头，整行为注释：
-      # 这是一条注释
-      choose("cooperate")  # 行尾注释也可以
+  用 // 表示单行注释：
+      // 这是一条注释
+      choose("teamwork")  // 行尾注释也可以
 
 2.2 缩进
   使用空格缩进表示代码块（4 个空格为标准），与 Python 一致。
@@ -73,20 +73,20 @@ MOSS 代码示例（一报还一报策略）：
 3.5 列表 list
       lst = [1, 2, 3]
       lst.append(4)
-      print(lst[0])      # 1
-      print(lst[-1])     # 4
-      print(lst[1:3])    # [2, 3]  切片
+      print(lst[0])      // 1
+      print(lst[-1])     // 4
+      print(lst[1:3])    // [2, 3]  切片
 
 3.6 字典 dict
       d = {"a": 1, "b": 2}
       d["c"] = 3
-      print(d.get("a"))  # 1
-      print(d.keys())    # ["a", "b", "c"]
+      print(d.get("a"))  // 1
+      print(d.keys())    // ["a", "b", "c"]
 
 3.7 元组 tuple
       t = (1, 2, 3)
-      print(t[0])        # 1
-      # 元组不可修改
+      print(t[0])        // 1
+      // 元组不可修改
 
 
 四、运算符
@@ -138,7 +138,7 @@ MOSS 代码示例（一报还一报策略）：
           print(x)
 
       for i in range(5):
-          print(i)  # 0 1 2 3 4
+          print(i)  // 0 1 2 3 4
 
 5.4 break / continue / pass
   break     跳出循环
@@ -158,26 +158,45 @@ MOSS 代码示例（一报还一报策略）：
       def add(a, b):
           return a + b
 
-      result = add(3, 4)  # 7
+      result = add(3, 4)  // 7
 
-6.2 main() 函数
-  MOSS 程序必须定义 main() 函数，引擎每轮自动调用它。
-  main() 内应调用 choose() 做出本轮决策。
+6.2 main() 函数与 final_choose 参赛选择
+  MOSS 程序必须定义 main() 函数，否则无法发布参赛。
+  main() 的唯一职责是设置 final_choose="策略函数名"，
+  引擎每轮会调用该策略函数做出决策。
+
+      main()="my_bot"
+
+      def tit_for_tat():
+          if len(opponent_history) == 0:
+              choose("teamwork")
+          else:
+              choose(opponent_history[-1])
+
+      def betrayer():
+          choose("betray")
 
       def main():
-          choose("cooperate")
+          final_choose = "tit_for_tat"   // 选择参赛策略
+
+  说明：
+    - 策略函数定义在 main() 外面，可以定义多个
+    - main() 里只设置 final_choose，不要写决策逻辑
+    - 测试代码（如 play()）写在 main() 外，提交前可删除
+    - 兼容旧写法：main() 里直接调用 choose() 也可工作（不推荐）
 
 
 七、博弈专用语法
 ------------------------------------------------------------
 
 7.1 choose(option)
-  在 main() 内调用，做出本轮选择。
-  option 必须是 "cooperate"（合作）或 "defect"（背叛）。
+  调用后立即结束当前函数（相当于 return），做出本轮选择。
+  option 可以是任意值（字符串、数字等），由裁判代码解释其含义。
+  例如囚徒困境可用 "teamwork"/"betray"，石头剪刀布可用 "rock"/"paper"/"scissors"。
 
       def main():
-          choose("cooperate")   # 合作
-          # choose("defect")    # 背叛
+          choose("teamwork")   // 选择合作（含义由裁判定义）
+          // choose("rock")    // 石头剪刀布
 
 7.2 只读变量（引擎每轮注入）
   win          上一轮是否赢（bool），第一轮为 False
@@ -189,28 +208,75 @@ MOSS 代码示例（一报还一报策略）：
 
       def main():
           if len(opponent_history) == 0:
-              choose("cooperate")
-          elif opponent_history[-1] == "defect":
-              choose("defect")
+              choose("teamwork")
+          elif opponent_history[-1] == "betray":
+              choose("betray")
           else:
-              choose("cooperate")
+              choose("teamwork")
 
 7.3 delay(秒)
   延迟函数，用于模拟思考时间，不影响实际决策结果。
 
       def main():
           delay(0.5)
-          choose("cooperate")
+          choose("teamwork")
 
 7.4 run "事件名" when 条件:
   事件钩子，当条件成立时执行代码块。
 
       def main():
-          choose("cooperate")
+          choose("teamwork")
 
-      # 上一局输了就打印日志
+      // 上一局输了就打印日志
       run "on_loss" when not win:
           print("上一局输了，总结教训")
+
+7.5 play(botA, botB, rounds): 内部训练对战
+  在代码内部让两个策略函数对战，返回每轮对战记录。
+  用于 Bot 自我训练、策略对比、模拟测试。
+  参数 botA、botB 是已定义的函数名（字符串或函数引用），rounds 是对战轮数。
+
+  注意：play() 只收集双方每轮的 choose() 输出，不做计分。
+  计分逻辑由你在 Bot 代码中自行编写（与具体游戏规则相关）。
+
+  返回 PlayResult 对象，print 时逐行显示每轮双方选择：
+
+      def tit_for_tat():
+          if len(opponent_history) == 0:
+              choose("teamwork")
+          else:
+              choose(opponent_history[-1])
+
+      def betrayer():
+          choose("betray")
+
+      log = play(tit_for_tat, betrayer, 3)
+      print(log)
+
+  输出示例：
+      teamwork betray
+      betray betray
+      teamwork betray
+
+  PlayResult 属性：
+    .nameA / .nameB   双方函数名
+    .rounds           每轮记录列表 [[choiceA, choiceB], ...]
+
+  自己计分示例（囚徒困境）：
+      result = play("tft", "betrayer", 50)
+      sa = 0
+      sb = 0
+      for r in result.rounds:
+          if r[0] == "teamwork" and r[1] == "teamwork":
+              sa = sa + 3; sb = sb + 3
+          elif r[0] == "betray" and r[1] == "teamwork":
+              sa = sa + 5; sb = sb + 0
+          // ... 其余情况自行定义
+
+  注意：
+    - play 内部每个函数拥有独立的 win/round/history/opponent_history
+    - 纯训练脚本可以没有 main() 函数
+    - play() 不内置计分，得分需自己根据游戏规则计算
 
 
 八、内置函数
@@ -241,7 +307,8 @@ MOSS 代码示例（一报还一报策略）：
 
 8.4 随机
   random()        返回 0~1 之间的浮点数
-  randint(a, b)   返回 a~b 之间的整数（含两端）
+  random(a, b)    返回 a~b 之间的整数（含两端）
+  randint(a, b)   同 random(a, b)，返回 a~b 整数
   choice(list)    从列表中随机取一个元素
 
 8.5 输出
@@ -295,20 +362,59 @@ MOSS 代码示例（一报还一报策略）：
   .index(x)           查找索引
 
 
-十、囚徒困境计分规则
+十、裁判代码（游戏规则）
 ------------------------------------------------------------
-标准 PD 计分矩阵：
+MOSS 语言本身不定义任何游戏规则。每场赛事的规则由管理员
+发布赛事时编写的「裁判代码」决定，玩家不可见。
 
-              对手合作    对手背叛
-  我合作       +3 (R)      +0 (S)
-  我背叛       +5 (T)      +1 (P)
+裁判代码在每场对战结束后执行，可用以下特殊变量：
+  P1  dict，包含：name（选手名）、score（得分，可写）、choices（本轮所有选择列表）
+  P2  dict，同上，对手
 
-  T = 5  背叛对方合作
-  R = 3  双方合作
-  P = 1  双方背叛
-  S = 0  合作被背叛
+裁判需设置：
+  winner = "P1"  或  winner = "P2"    裁定胜者
+  P1["score"] = 数字                    给 P1 打分（可选）
+  P2["score"] = 数字                    给 P2 打分（可选）
 
-多轮累计积分，积分最高者胜。
+示例 1：石头剪刀布裁判
+  sa = 0
+  sb = 0
+  for i in range(len(P1["choices"])):
+      a = P1["choices"][i]
+      b = P2["choices"][i]
+      if a == b:
+          continue
+      elif (a == "rock" and b == "scissors") or (a == "scissors" and b == "paper") or (a == "paper" and b == "rock"):
+          sa = sa + 1
+      else:
+          sb = sb + 1
+  P1["score"] = sa
+  P2["score"] = sb
+  if sa > sb:
+      winner = "P1"
+  elif sb > sa:
+      winner = "P2"
+
+示例 2：囚徒困境裁判（自定义计分）
+  sa = 0
+  sb = 0
+  for i in range(len(P1["choices"])):
+      a = P1["choices"][i]
+      b = P2["choices"][i]
+      if a == "teamwork" and b == "teamwork":
+          sa = sa + 3; sb = sb + 3
+      elif a == "betray" and b == "teamwork":
+          sa = sa + 5; sb = sb + 0
+      elif a == "teamwork" and b == "betray":
+          sa = sa + 0; sb = sb + 5
+      else:
+          sa = sa + 1; sb = sb + 1
+  P1["score"] = sa
+  P2["score"] = sb
+  if sa > sb:
+      winner = "P1"
+  elif sb > sa:
+      winner = "P2"
 
 
 十一、完整示例
@@ -317,48 +423,59 @@ MOSS 代码示例（一报还一报策略）：
 11.1 一报还一报（tit-for-tat）
       def main():
           if len(opponent_history) == 0:
-              choose("cooperate")
+              choose("teamwork")
           else:
               choose(opponent_history[-1])
 
 11.2 永远合作
       def main():
-          choose("cooperate")
+          choose("teamwork")
 
 11.3 永远背叛
       def main():
-          choose("defect")
+          choose("betray")
 
 11.4 随机
       def main():
-          if randint(0, 1) == 0:
-              choose("cooperate")
+          if random(0, 1) == 0:
+              choose("teamwork")
           else:
-              choose("defect")
+              choose("betray")
 
 11.5 冷酷触发（grim-trigger）
       def main():
           betrayed = False
           for c in opponent_history:
-              if c == "defect":
+              if c == "betray":
                   betrayed = True
                   break
           if betrayed:
-              choose("defect")
+              choose("betray")
           else:
-              choose("cooperate")
+              choose("teamwork")
 
 11.6 赢存输改（pavlov）
       def main():
           if len(history) == 0:
-              choose("cooperate")
+              choose("teamwork")
           elif win:
               choose(history[-1])
           else:
-              if history[-1] == "cooperate":
-                  choose("defect")
+              if history[-1] == "teamwork":
+                  choose("betray")
               else:
-                  choose("cooperate")
+                  choose("teamwork")
+
+11.7 石头剪刀布示例
+      def main():
+          // 随机出拳
+          r = random(0, 2)
+          if r == 0:
+              choose("rock")
+          elif r == 1:
+              choose("paper")
+          else:
+              choose("scissors")
 
 
 十二、沙盒限制
@@ -368,8 +485,8 @@ MOSS 代码示例（一报还一报策略）：
   - 单轮最大执行步数 100,000（防止死循环）
   - 最大递归深度 200
   - win / round / history / opponent_history 为只读
-  - 编译或运行出错时，本轮默认 choose("defect")
-  - choose() 参数必须是 "cooperate" 或 "defect"，否则本轮默认 defect
+  - choose() 接受任意值，不做限制；未调用 choose() 则本轮决策为 null
+  - choose() 相当于 return，调用后函数立即结束
 
 ============================================================
   MOSS 语法说明手册  结束

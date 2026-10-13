@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MOSS VSCode 插件下载 - 编程有趣游戏赛事</title>
+<style>
+  :root{--bg-0:#0a0e14;--bg-1:#0f1620;--bg-2:#131c28;--line:#1f2a37;--text:#e6edf3;--muted:#7d8b9a;--keyword:#ff7b72;--func:#d2a8ff;--str:#a5d6ff;--tag:#7ee787;--num:#f2cc60;--accent:#58a6ff;--danger:#f85149;--shadow:0 20px 60px rgba(0,0,0,.5)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{min-height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);background:radial-gradient(1200px 800px at 20% -10%,#16223a 0%,transparent 60%),radial-gradient(900px 700px at 110% 110%,#1a2b1e 0%,transparent 55%),linear-gradient(180deg,var(--bg-0),var(--bg-1))}
+  .mono{font-family:"JetBrains Mono","Fira Code","Cascadia Code","Consolas",monospace}
+  .grid-bg{position:fixed;inset:0;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:44px 44px;opacity:.18;mask-image:radial-gradient(circle at 50% 40%,#000 0%,transparent 75%);pointer-events:none;z-index:0}
+  header{position:fixed;top:0;left:0;right:0;height:60px;display:flex;align-items:center;padding:0 28px;border-bottom:1px solid var(--line);background:rgba(10,14,20,.72);backdrop-filter:blur(12px);z-index:10}
+  .brand{display:flex;align-items:center;font-size:17px;font-weight:600;cursor:pointer}
+  .brand .hash{color:var(--num)}.brand .bl{color:var(--accent)}.brand .sl{color:var(--muted)}.brand .cn{color:var(--text);margin:0 2px}
+  .header-right{margin-left:auto;display:flex;align-items:center;gap:14px;color:var(--muted);font-size:13px}
+  .header-right a{color:var(--accent);text-decoration:none}
+  main{min-height:100%;padding:80px 24px 40px;position:relative;z-index:1;max-width:860px;margin:0 auto}
+  .card{background:linear-gradient(180deg,rgba(19,28,40,.92),rgba(15,22,32,.92));border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:24px}
+  .card-top{display:flex;align-items:center;gap:7px;padding:13px 16px;border-bottom:1px solid var(--line);background:rgba(0,0,0,.2)}
+  .wd{width:12px;height:12px;border-radius:50%}.dr{background:#ff5f57}.dy{background:#febc2e}.dg{background:#28c840}
+  .card-top .title{margin-left:8px;color:var(--muted);font-size:12.5px}
+  .card-body{padding:28px}
+  h1{font-size:26px;margin-bottom:8px}
+  .subtitle{color:var(--muted);font-size:14px;margin-bottom:24px;line-height:1.7}
+  .download-box{display:flex;align-items:center;gap:20px;padding:24px;background:rgba(88,166,255,.06);border:1px solid rgba(88,166,255,.25);border-radius:12px;margin-bottom:24px}
+  .icon{width:64px;height:64px;border-radius:14px;background:linear-gradient(135deg,var(--accent),#3a8bff);display:flex;align-items:center;justify-content:center;font-size:32px;flex-shrink:0}
+  .dl-info{flex:1}
+  .dl-name{font-size:18px;font-weight:700;margin-bottom:4px}
+  .dl-meta{color:var(--muted);font-size:13px}
+  .dl-btn{padding:14px 32px;background:linear-gradient(90deg,var(--accent),#3a8bff);border:none;border-radius:10px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;transition:all .18s;font-family:inherit;white-space:nowrap}
+  .dl-btn:hover{filter:brightness(1.08);box-shadow:0 8px 24px rgba(88,166,255,.35)}
+  .steps{counter-reset:step}
+  .step{display:flex;gap:16px;padding:16px 0;border-bottom:1px solid var(--line)}
+  .step:last-child{border-bottom:none}
+  .step-num{width:32px;height:32px;border-radius:50%;background:var(--bg-2);border:1px solid var(--accent);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+  .step-content{flex:1}
+  .step-title{font-weight:600;margin-bottom:6px}
+  .step-desc{color:var(--muted);font-size:13.5px;line-height:1.7}
+  .step-desc code{background:var(--bg-2);padding:2px 8px;border-radius:4px;color:var(--str);font-size:12.5px;font-family:monospace}
+  .features{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
+  .feat{padding:14px;background:var(--bg-2);border:1px solid var(--line);border-radius:10px}
+  .feat-title{font-size:13.5px;font-weight:600;color:var(--accent);margin-bottom:4px}
+  .feat-desc{font-size:12.5px;color:var(--muted)}
+  .toast{position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-20px);background:var(--bg-2);border:1px solid var(--line);color:var(--text);padding:11px 20px;border-radius:8px;font-size:13.5px;box-shadow:var(--shadow);z-index:100;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.success{border-color:rgba(126,231,135,.5)}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<header>
+  <div class="brand mono" onclick="location.href='index.html'">
+    <span class="hash">#</span><span class="bl">&lt;</span><span class="sl">/</span><span class="bl">&gt;</span><span class="cn">MOSS 插件下载</span><span class="bl">&lt;</span><span class="sl">/</span><span class="bl">&gt;</span>
+  </div>
+  <div class="header-right"><a href="changelog.html">更新日志</a> <a href="index.html">返回主站</a></div>
+</header>
+
+<main>
+  <div class="card">
+    <div class="card-top"><span class="wd dr"></span><span class="wd dy"></span><span class="wd dg"></span><span class="title mono">moss-language-1.0.0.vsix</span></div>
+    <div class="card-body">
+      <h1>MOSS 语言 VSCode 插件</h1>
+      <p class="subtitle">新手必装！为 <code class="mono">.moss</code> 文件提供语法高亮、编译检查和运行对战功能。<br/>下载后拖入 VSCode 即可安装。</p>
+
+      <div class="download-box">
+        <div class="icon">📦</div>
+        <div class="dl-info">
+          <div class="dl-name">moss-language-1.0.0.vsix</div>
+          <div class="dl-meta mono">版本 1.0.0 · 27.4 KB · 支持 VSCode 1.74+</div>
+        </div>
+        <a href="moss-language-1.0.0.vsix" download class="dl-btn">⬇ 下载插件</a>
+      </div>
+
+      <h3 style="font-size:16px;margin-bottom:16px;color:var(--accent)">安装步骤</h3>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-title">下载 vsix 文件</div>
+            <div class="step-desc">点击上方下载按钮，保存 <code>moss-language-1.0.0.vsix</code> 到本地。</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-title">打开 VSCode 扩展面板</div>
+            <div class="step-desc">按 <code>Ctrl+Shift+X</code> 打开扩展，点击右上角 <code>···</code> 菜单。</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-title">Install from VSIX</div>
+            <div class="step-desc">选择 <code>Install from VSIX...</code>，选中下载的 <code>moss-language-1.0.0.vsix</code>。</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <div class="step-title">重启 VSCode</div>
+            <div class="step-desc">安装完成后重启 VSCode，打开任意 <code>.moss</code> 文件即可使用。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-top"><span class="wd dr"></span><span class="wd dy"></span><span class="wd dg"></span><span class="title mono">features.py</span></div>
+    <div class="card-body">
+      <h3 style="font-size:16px;margin-bottom:16px;color:var(--accent)">插件功能</h3>
+      <div class="features">
+        <div class="feat">
+          <div class="feat-title">🎨 语法高亮</div>
+          <div class="feat-desc">关键字、字符串、数字、内置函数、注释全部高亮</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">✓ 编译检查</div>
+          <div class="feat-desc"><code>Ctrl+Shift+B</code> 检查语法错误</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">▶ 运行对战</div>
+          <div class="feat-desc"><code>F5</code> 对战随机内置 Bot</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">⚙ 自定义对手</div>
+          <div class="feat-desc">自选对手 Bot 和对战轮数</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function toast(m,t=''){const e=document.getElementById('toast');e.textContent=m;e.className='toast show '+t;clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),2600)}
+// 检测是否已安装提示（可选）
+</script>
+</body>
+</html>

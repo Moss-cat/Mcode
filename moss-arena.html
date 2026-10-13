@@ -279,6 +279,47 @@
   .bot-item .nm { font-size: 13px; color: var(--text); }
   .bot-item .desc { font-size: 11px; color: var(--muted); margin-left: auto; }
 
+  /* 计分矩阵设置 */
+  .payoff-section {
+    background: var(--bg-0); border: 1px solid var(--line); border-radius: 10px;
+    margin-bottom: 12px; overflow: hidden;
+  }
+  .payoff-toggle {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; cursor: pointer; font-size: 13px; color: var(--text);
+    transition: background 0.15s;
+  }
+  .payoff-toggle:hover { background: rgba(88, 166, 255, 0.06); }
+  .payoff-arrow { transition: transform 0.2s; }
+  .payoff-arrow.open { transform: rotate(180deg); }
+  .payoff-body { padding: 12px 14px; border-top: 1px solid var(--line); }
+  .payoff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .payoff-cell {
+    background: var(--bg-1); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px;
+  }
+  .payoff-label { font-size: 11.5px; color: var(--muted); margin-bottom: 6px; }
+  .payoff-reset { margin-top: 10px; text-align: right; }
+
+  /* 自定义 Bot 代码框 */
+  .code-area {
+    width: 100%; background: var(--bg-2); border: 1px solid var(--line);
+    color: var(--text); padding: 10px; border-radius: 8px; font-size: 12.5px;
+    font-family: "JetBrains Mono", "Fira Code", monospace; outline: none;
+    resize: vertical; min-height: 60px;
+  }
+  .code-area:focus { border-color: var(--accent); }
+  .custom-bot-box {
+    background: var(--bg-0); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px; margin-bottom: 12px;
+  }
+  .bot-item.custom { background: rgba(210, 168, 255, 0.06); }
+  .bot-item .del-btn {
+    background: none; border: none; color: var(--danger); cursor: pointer;
+    font-size: 14px; padding: 0 4px; opacity: 0.6; transition: opacity 0.15s;
+  }
+  .bot-item .del-btn:hover { opacity: 1; }
+
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
@@ -345,6 +386,37 @@
           <div class="mode-tab" data-mode="rr">多人混战 (round-robin)</div>
         </div>
 
+        <!-- 计分矩阵自定义 -->
+        <div class="payoff-section">
+          <div class="payoff-toggle" id="payoffToggle">
+            <span>⚙ 计分矩阵设置</span>
+            <span class="payoff-arrow" id="payoffArrow">▾</span>
+          </div>
+          <div class="payoff-body" id="payoffBody" style="display:none">
+            <div class="payoff-grid">
+              <div class="payoff-cell">
+                <div class="payoff-label">T（背叛对方合作）</div>
+                <input class="input-num" id="payoffT" type="number" value="5" />
+              </div>
+              <div class="payoff-cell">
+                <div class="payoff-label">R（双方合作）</div>
+                <input class="input-num" id="payoffR" type="number" value="3" />
+              </div>
+              <div class="payoff-cell">
+                <div class="payoff-label">P（双方背叛）</div>
+                <input class="input-num" id="payoffP" type="number" value="1" />
+              </div>
+              <div class="payoff-cell">
+                <div class="payoff-label">S（合作被背叛）</div>
+                <input class="input-num" id="payoffS" type="number" value="0" />
+              </div>
+            </div>
+            <div class="payoff-reset">
+              <button class="btn btn-ghost" id="resetPayoff" type="button">重置为标准 PD (5/3/1/0)</button>
+            </div>
+          </div>
+        </div>
+
         <!-- 1v1 配置 -->
         <div id="cfg-1v1">
           <div class="config-row">
@@ -357,12 +429,20 @@
                 <option value="rand">random</option>
                 <option value="grim">grim-trigger</option>
                 <option value="pavlov">pavlov</option>
+                <option value="custom">✏ 自定义代码...</option>
               </select>
             </div>
             <div>
               <div class="field-label">轮数</div>
-              <input class="input-num" id="rounds" type="number" min="1" max="2000" value="200" />
+              <input class="input-num" id="rounds" type="number" min="1" max="5000" value="200" />
             </div>
+          </div>
+          <!-- 自定义对手代码 -->
+          <div id="customOpponentBox" style="display:none;margin-top:12px;">
+            <div class="field-label">对手 Bot 名称</div>
+            <input class="input" id="customOppName" type="text" value="自定义对手" placeholder="给对手起个名字" style="margin-bottom:8px;" />
+            <div class="field-label">对手代码</div>
+            <textarea class="code-area" id="customOppCode" rows="8" placeholder="在此粘贴对手的 .moss 代码..."></textarea>
           </div>
         </div>
 
@@ -370,10 +450,21 @@
         <div id="cfg-rr" style="display:none">
           <div class="field-label" style="margin-bottom:6px">选择参与混战的 Bot（至少 2 个）</div>
           <div class="bot-list" id="botList"></div>
+
+          <!-- 添加自定义 Bot -->
+          <div class="custom-bot-box">
+            <div class="field-label">添加自定义 Bot</div>
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+              <input class="input" id="customBotName" type="text" placeholder="Bot 名称" style="flex:1" />
+              <button class="btn btn-ghost" id="addCustomBot" type="button">+ 添加</button>
+            </div>
+            <textarea class="code-area" id="customBotCode" rows="5" placeholder="粘贴自定义 Bot 代码..."></textarea>
+          </div>
+
           <div class="config-row" style="margin-bottom:0">
             <div>
               <div class="field-label">每对对战轮数</div>
-              <input class="input-num" id="roundsRR" type="number" min="1" max="500" value="50" />
+              <input class="input-num" id="roundsRR" type="number" min="1" max="1000" value="50" />
             </div>
             <div></div>
           </div>
@@ -670,16 +761,79 @@ document.querySelectorAll('.mode-tab').forEach(tab => {
 });
 
 // 渲染多人 bot 列表
+// 自定义 bot 列表（多人混战）
+const customBots = [];
+
 function renderBotList() {
-  botList.innerHTML = BOT_META.map((b, i) => `
+  const builtinHtml = BOT_META.map((b, i) => `
     <label class="bot-item">
       <input type="checkbox" value="${b.id}" ${i < 3 ? 'checked' : ''} />
       <span class="nm">${b.name}</span>
       <span class="desc">${b.desc}</span>
     </label>
   `).join('');
+  const customHtml = customBots.map(b => `
+    <label class="bot-item custom">
+      <input type="checkbox" value="${b.id}" checked />
+      <span class="nm">${b.name}</span>
+      <span class="desc" style="color:var(--func)">自定义</span>
+      <button class="del-btn" type="button" onclick="removeCustomBot('${b.id}')" title="删除">✕</button>
+    </label>
+  `).join('');
+  botList.innerHTML = builtinHtml + customHtml;
 }
 renderBotList();
+
+window.removeCustomBot = (id) => {
+  const idx = customBots.findIndex(b => b.id === id);
+  if (idx >= 0) {
+    customBots.splice(idx, 1);
+    renderBotList();
+  }
+};
+
+// ============================================================
+//  计分矩阵折叠
+// ============================================================
+document.getElementById('payoffToggle').addEventListener('click', () => {
+  const body = document.getElementById('payoffBody');
+  const arrow = document.getElementById('payoffArrow');
+  if (body.style.display === 'none') {
+    body.style.display = '';
+    arrow.classList.add('open');
+  } else {
+    body.style.display = 'none';
+    arrow.classList.remove('open');
+  }
+});
+
+// 重置计分矩阵
+document.getElementById('resetPayoff').addEventListener('click', () => {
+  document.getElementById('payoffT').value = 5;
+  document.getElementById('payoffR').value = 3;
+  document.getElementById('payoffP').value = 1;
+  document.getElementById('payoffS').value = 0;
+  showToast('已重置为标准 PD (T=5/R=3/P=1/S=0)', 'success');
+});
+
+// 对手选择切换：自定义代码显示/隐藏
+oppEl.addEventListener('change', () => {
+  const box = document.getElementById('customOpponentBox');
+  box.style.display = oppEl.value === 'custom' ? '' : 'none';
+});
+
+// 添加自定义 bot 到混战
+document.getElementById('addCustomBot').addEventListener('click', () => {
+  const name = document.getElementById('customBotName').value.trim();
+  const code = document.getElementById('customBotCode').value;
+  if (!name) { showToast('请填写 Bot 名称', 'error'); return; }
+  if (!code.trim()) { showToast('请填写 Bot 代码', 'error'); return; }
+  customBots.push({ id: 'custom_' + Date.now(), name, code });
+  document.getElementById('customBotName').value = '';
+  document.getElementById('customBotCode').value = '';
+  renderBotList();
+  showToast(`已添加自定义 Bot: ${name}`, 'success');
+});
 
 // ============================================================
 //  语法检查
@@ -744,16 +898,34 @@ function resetResults() {
   statusEl.textContent = '准备就绪。点击「开始对战」运行博弈。';
 }
 
+// 获取当前计分矩阵
+function getPayoff() {
+  const T = parseFloat(document.getElementById('payoffT').value) || 5;
+  const R = parseFloat(document.getElementById('payoffR').value) || 3;
+  const P = parseFloat(document.getElementById('payoffP').value) || 1;
+  const S = parseFloat(document.getElementById('payoffS').value) || 0;
+  return { CC: R, DD: P, CD: S, DC: T };
+}
+
 function run1v1(myCode) {
   const oppId = oppEl.value;
-  const oppCode = SAMPLES[oppId];
-  const oppName = BOT_META.find(b => b.id === oppId).name;
+  let oppCode, oppName;
+
+  if (oppId === 'custom') {
+    oppName = document.getElementById('customOppName').value.trim() || '自定义对手';
+    oppCode = document.getElementById('customOppCode').value;
+    if (!oppCode.trim()) { showToast('请填写自定义对手代码', 'error'); return; }
+  } else {
+    oppCode = SAMPLES[oppId];
+    oppName = BOT_META.find(b => b.id === oppId).name;
+  }
+
   const rounds = Math.max(1, parseInt(roundsEl.value) || 200);
 
   nameA.textContent = '我的 Bot';
   nameB.textContent = oppName;
 
-  const arena = new MOSS.Arena({ rounds, mode: '1v1' });
+  const arena = new MOSS.Arena({ rounds, mode: '1v1', payoff: getPayoff() });
   const myBot = arena.addBot('我的 Bot', myCode);
   arena.addBot(oppName, oppCode);
 
@@ -804,14 +976,19 @@ function runRoundRobin(myCode) {
   if (checked.length < 2) { showToast('至少选择 2 个 Bot 参与混战', 'error'); return; }
 
   const rounds = Math.max(1, parseInt(roundsRREl.value) || 50);
-  const arena = new MOSS.Arena({ rounds, mode: 'round-robin' });
+  const arena = new MOSS.Arena({ rounds, mode: 'round-robin', payoff: getPayoff() });
 
   // 加入我的 bot
   const myBot = arena.addBot('我的 Bot', myCode);
-  // 加入选中的示例 bot
+  // 加入选中的示例 bot 和自定义 bot
   checked.forEach(id => {
-    const meta = BOT_META.find(b => b.id === id);
-    arena.addBot(meta.name, SAMPLES[id]);
+    if (id.startsWith('custom_')) {
+      const cb = customBots.find(b => b.id === id);
+      if (cb) arena.addBot(cb.name, cb.code);
+    } else {
+      const meta = BOT_META.find(b => b.id === id);
+      arena.addBot(meta.name, SAMPLES[id]);
+    }
   });
 
   statusEl.innerHTML = `<span class="run-tag">● 混战进行中...</span>`;

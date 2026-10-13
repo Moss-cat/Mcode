@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MOSS 赛事对战 - 编程有趣游戏赛事</title>
+<style>
+  :root{--bg-0:#0a0e14;--bg-1:#0f1620;--bg-2:#131c28;--line:#1f2a37;--text:#e6edf3;--muted:#7d8b9a;--keyword:#ff7b72;--func:#d2a8ff;--str:#a5d6ff;--tag:#7ee787;--num:#f2cc60;--accent:#58a6ff;--danger:#f85149;--shadow:0 20px 60px rgba(0,0,0,.5)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{min-height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);background:radial-gradient(1200px 800px at 20% -10%,#16223a 0%,transparent 60%),radial-gradient(900px 700px at 110% 110%,#1a2b1e 0%,transparent 55%),linear-gradient(180deg,var(--bg-0),var(--bg-1))}
+  .mono{font-family:"JetBrains Mono","Fira Code","Cascadia Code","Consolas",monospace}
+  .grid-bg{position:fixed;inset:0;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:44px 44px;opacity:.18;mask-image:radial-gradient(circle at 50% 40%,#000 0%,transparent 75%);pointer-events:none;z-index:0}
+  header{position:fixed;top:0;left:0;right:0;height:60px;display:flex;align-items:center;padding:0 28px;border-bottom:1px solid var(--line);background:rgba(10,14,20,.72);backdrop-filter:blur(12px);z-index:10}
+  .brand{display:flex;align-items:center;font-size:17px;font-weight:600;cursor:pointer}
+  .brand .hash{color:var(--num)}.brand .bl{color:var(--accent)}.brand .sl{color:var(--muted)}.brand .cn{color:var(--text);margin:0 2px}
+  .header-right{margin-left:auto;display:flex;align-items:center;gap:14px;color:var(--muted);font-size:13px}
+  main{min-height:100%;padding:80px 24px 40px;position:relative;z-index:1;max-width:1100px;margin:0 auto}
+  .card{background:linear-gradient(180deg,rgba(19,28,40,.92),rgba(15,22,32,.92));border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+  .card-top{display:flex;align-items:center;gap:7px;padding:13px 16px;border-bottom:1px solid var(--line);background:rgba(0,0,0,.2)}
+  .wd{width:12px;height:12px;border-radius:50%}.dr{background:#ff5f57}.dy{background:#febc2e}.dg{background:#28c840}
+  .card-top .title{margin-left:8px;color:var(--muted);font-size:12.5px}
+  .card-body{padding:24px}
+  .info-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+  .info-box{flex:1;min-width:160px;background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:14px}
+  .info-label{font-size:11.5px;color:var(--muted);margin-bottom:6px}
+  .info-val{font-size:18px;font-weight:700;color:var(--text)}
+  .info-val.small{font-size:14px}
+  .btn{padding:11px 22px;border:1px solid var(--line);border-radius:8px;background:var(--bg-2);color:var(--text);font-size:14px;cursor:pointer;transition:all .18s;font-family:inherit}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn-primary{background:linear-gradient(90deg,var(--accent),#3a8bff);border:none;color:#fff;font-weight:600}
+  .btn-primary:hover{filter:brightness(1.08);box-shadow:0 8px 24px rgba(88,166,255,.35);color:#fff}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .ranking{margin-top:20px}
+  .ranking h3{font-size:16px;margin-bottom:14px;color:var(--accent-2)}
+  .rank-row{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg-2);border:1px solid var(--line);border-radius:10px;margin-bottom:8px}
+  .rank-row.gold{background:rgba(242,204,96,.08);border-color:rgba(242,204,96,.3)}
+  .rk{font-size:18px;font-weight:700;width:36px;text-align:center}
+  .rn{flex:1;font-weight:600}
+  .sc{font-family:monospace;font-size:20px;font-weight:700;color:var(--accent)}
+  .match-list{margin-top:20px;max-height:400px;overflow-y:auto;background:var(--bg-0);border:1px solid var(--line);border-radius:10px;padding:12px}
+  .match-item{padding:10px 12px;border-bottom:1px solid var(--line);font-size:13px}
+  .match-item:last-child{border-bottom:none}
+  .match-item .names{color:var(--text);font-weight:600}
+  .match-item .score{color:var(--accent);font-family:monospace}
+  .status-big{font-size:20px;font-weight:700;text-align:center;margin:20px 0}
+  .toast{position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-20px);background:var(--bg-2);border:1px solid var(--line);color:var(--text);padding:11px 20px;border-radius:8px;font-size:13.5px;box-shadow:var(--shadow);z-index:100;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.success{border-color:rgba(126,231,135,.5)}
+  .toast.error{border-color:rgba(248,81,73,.5)}
+  ::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<header>
+  <div class="brand mono" onclick="location.href='index.html'">
+    <span class="hash">#</span><span class="bl">&lt;</span><span class="sl">/</span><span class="bl">&gt;</span><span class="cn">MOSS 赛事对战</span><span class="bl">&lt;</span><span class="sl">/</span><span class="bl">&gt;</span>
+  </div>
+  <div class="header-right"><a href="admin.html" style="color:var(--accent);text-decoration:none;">返回管理页</a></div>
+</header>
+
+<main>
+  <div class="card">
+    <div class="card-top"><span class="wd dr"></span><span class="wd dy"></span><span class="wd dg"></span><span class="title mono">tournament_run.py — 赛事运行</span></div>
+    <div class="card-body">
+      <div id="tourInfo"></div>
+      <div class="status-big" id="status">准备运行...</div>
+      <div id="rankingBox" style="display:none">
+        <div class="ranking"><h3>🏆 最终排名</h3><div id="rankingList"></div></div>
+      </div>
+      <div id="matchBox" style="display:none">
+        <h3 style="font-size:14px;color:var(--muted);margin-bottom:10px">对战明细</h3>
+        <div class="match-list" id="matchList"></div>
+      </div>
+      <div style="text-align:center;margin-top:20px">
+        <button class="btn btn-primary" id="runBtn" onclick="runTournament()">▶ 开始对战</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+<script src="moss.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+function toast(m,t=''){const e=$('toast');e.textContent=m;e.className='toast show '+t;clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),2600)}
+
+const params=new URLSearchParams(location.search);
+const tourId=params.get('id');
+let tournament=null;
+
+function loadTournament(){
+  const tours=JSON.parse(localStorage.getItem('pgf_tours')||'[]');
+  tournament=tours.find(t=>t.id===tourId);
+  if(!tournament){$('status').textContent='赛事不存在';return}
+  $('tourInfo').innerHTML=`
+    <div class="info-row">
+      <div class="info-box"><div class="info-label">赛事名称</div><div class="info-val small">${tournament.title}</div></div>
+      <div class="info-box"><div class="info-label">对战模式</div><div class="info-val small">${tournament.mossMode==='round-robin'?'循环赛':tournament.mossMode==='elimination'?'单败淘汰':'1v1随机匹配'}</div></div>
+      <div class="info-box"><div class="info-label">每对轮数</div><div class="info-val">${tournament.mossRounds||100}</div></div>
+      <div class="info-box"><div class="info-label">参赛 Bot 数</div><div class="info-val">${tournament.mossBots.length}</div></div>
+    </div>
+    <div class="info-box" style="margin-bottom:0"><div class="info-label">游戏类型</div>
+      <div class="info-val small">${tournament.gameType||'通用博弈'}</div>
+    </div>
+  `;
+  if(tournament.mossBots.length<2){
+    $('status').innerHTML='<span style="color:var(--danger)">参赛 Bot 不足 2 个，无法开始</span>';
+    $('runBtn').style.display='none';
+  }else{
+    $('status').textContent='点击下方按钮开始随机匹配对战';
+  }
+}
+
+function runTournament(){
+  if(!tournament)return;
+  if(!tournament.mossBots || tournament.mossBots.length < 2){
+    toast('至少需要 2 个 Bot 才能开始比赛','error');return;
+  }
+  $('runBtn').disabled=true;
+  $('runBtn').textContent='⏳ 运行中...';
+  $('status').innerHTML='<span style="color:var(--num)">对战进行中...</span>';
+
+  setTimeout(()=>{
+    try{
+      const mode = tournament.mossMode || 'elimination';
+      const arena=new MOSS.Arena({
+        rounds:tournament.mossRounds||100,
+        mode,
+        judgeCode: tournament.judgeCode || '',
+      });
+      tournament.mossBots.forEach(b=>arena.addBot(b.username, b.code));
+
+      const matchList=$('matchList');
+      matchList.innerHTML='';
+      $('matchBox').style.display='';
+
+      let result;
+      if(mode==='round-robin'){
+        arena.onMatchEnd=r=>{
+          const item=document.createElement('div');
+          item.className='match-item';
+          item.innerHTML=`<span class="names">${r.botA} vs ${r.botB}</span> <span class="score">${r.scoreA} : ${r.scoreB}</span>`;
+          matchList.appendChild(item);
+        };
+        result=arena.runRoundRobin();
+      }else if(mode==='elimination'){
+        // 单败淘汰
+        arena.onRoundEnd=ri=>{
+          const header=document.createElement('div');
+          header.style.cssText='font-size:13px;font-weight:600;color:var(--accent);margin:12px 0 6px;';
+          header.textContent=`第 ${matchList.querySelectorAll('.round-header').length+1} 轮 · 晋级：${ri.survivors.join(', ')}`;
+          header.className='round-header';
+          matchList.appendChild(header);
+          ri.matches.forEach(r=>{
+            const item=document.createElement('div');
+            item.className='match-item';
+            item.innerHTML=`<span class="names">${r.botA} vs ${r.botB}</span> <span class="score">${r.scoreA} : ${r.scoreB}</span> <span style="color:var(--tag);font-size:11px;">→ ${r.winner} 胜</span>`;
+            matchList.appendChild(item);
+          });
+        };
+        result=arena.runElimination();
+        result.ranking = [{name:result.champion,score:0}];
+      }else{
+        // 1v1 随机匹配
+        const bots=[...arena.bots];
+        for(let i=bots.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[bots[i],bots[j]]=[bots[j],bots[i]];}
+        const scores={};bots.forEach(b=>scores[b.name]=0);
+        for(let i=0;i<bots.length-1;i+=2){
+          const r=arena.run1v1(bots[i],bots[i+1]);
+          scores[bots[i].name]+=r.scoreA;scores[bots[i+1].name]+=r.scoreB;
+          const item=document.createElement('div');
+          item.className='match-item';
+          item.innerHTML=`<span class="names">${r.botA} vs ${r.botB}</span> <span class="score">${r.scoreA} : ${r.scoreB}</span>`;
+          matchList.appendChild(item);
+        }
+        result={ranking:Object.entries(scores).map(([name,score])=>({name,score})).sort((a,b)=>b.score-a.score)};
+      }
+
+      // 显示排名/冠军
+      $('rankingBox').style.display='';
+      if(mode==='elimination'){
+        $('rankingList').innerHTML=`<div class="rank-row gold"><span class="rk">🏆</span><span class="rn">${result.champion}</span><span class="sc">冠军</span></div>`;
+        $('status').innerHTML=`<span style="color:var(--tag)">🏆 比赛结束！冠军：${result.champion}</span>`;
+      }else{
+        $('rankingList').innerHTML=result.ranking.map((r,i)=>{
+          const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`;
+          const detail = r.wins !== undefined ? `${r.wins}胜 ${r.score}分` : r.score;
+          return `<div class="rank-row ${i===0?'gold':''}"><span class="rk">${medal}</span><span class="rn">${r.name}</span><span class="sc">${detail}</span></div>`;
+        }).join('');
+        $('status').innerHTML=`<span style="color:var(--tag)">🏆 比赛结束！冠军：${result.ranking[0].name}</span>`;
+      }
+      $('runBtn').textContent='✓ 比赛完成';
+
+      // 标记赛事完成
+      const tours=JSON.parse(localStorage.getItem('pgf_tours')||'[]');
+      const idx=tours.findIndex(t=>t.id===tourId);
+      if(idx>=0){tours[idx].status='completed';tours[idx].finalResult=result.ranking;localStorage.setItem('pgf_tours',JSON.stringify(tours))}
+    }catch(e){
+      $('status').innerHTML=`<span style="color:var(--danger)">运行错误：${e.message}</span>`;
+      $('runBtn').disabled=false;$('runBtn').textContent='▶ 重新开始';
+    }
+  },100);
+}
+
+loadTournament();
+</script>
+</body>
+</html>

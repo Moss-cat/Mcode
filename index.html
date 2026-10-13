@@ -370,6 +370,30 @@
     header { padding: 0 16px; }
     .brand { font-size: 15px; }
   }
+
+  /* ===== 角色切换 ===== */
+  .role-tabs {
+    display: flex; gap: 4px; margin-bottom: 20px;
+    background: var(--bg-2); padding: 4px; border-radius: 10px;
+    border: 1px solid var(--line);
+  }
+  .role-tab {
+    flex: 1; padding: 9px 0; text-align: center; font-size: 13px;
+    border-radius: 7px; cursor: pointer; color: var(--muted);
+    transition: all 0.18s ease; font-weight: 500;
+  }
+  .role-tab.active {
+    background: rgba(88, 166, 255, 0.15); color: var(--accent);
+  }
+  .role-tab[data-role="super"].active {
+    background: rgba(248, 81, 73, 0.15); color: var(--danger);
+  }
+  .role-entry {
+    text-align: center; padding: 10px 0;
+  }
+  .entry-icon { font-size: 42px; margin-bottom: 12px; }
+  .entry-title { font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+  .entry-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -381,6 +405,8 @@
     <span class="hash">#</span><span class="bracket-l">&lt;</span><span class="slash">/</span><span class="bracket-r">&gt;</span><span class="cn">编程有趣游戏赛事</span><span class="bracket-l">&lt;</span><span class="slash">/</span><span class="bracket-r">&gt;</span>
   </div>
   <div class="header-right" id="headerRight">
+    <a href="download.html" style="color:var(--accent);text-decoration:none;font-size:13px;margin-right:14px;">📦 插件下载</a>
+    <a href="changelog.html" style="color:var(--accent);text-decoration:none;font-size:13px;margin-right:14px;">📄 更新日志</a>
     <span class="dot"></span>
     <span>在线</span>
   </div>
@@ -397,6 +423,15 @@
         <span class="title mono">auth.py — 登录</span>
       </div>
       <div class="card-body">
+        <!-- 角色切换 -->
+        <div class="role-tabs">
+          <div class="role-tab active" data-role="user">普通用户</div>
+          <div class="role-tab" data-role="admin">管理员</div>
+          <div class="role-tab" data-role="super">超管</div>
+        </div>
+
+        <!-- 普通用户登录 -->
+        <div id="userLoginBox">
         <form id="loginForm" autocomplete="off">
           <div class="field">
             <label class="label" for="loginAccount">账号 / 邮箱 <span class="req">*</span></label>
@@ -411,6 +446,36 @@
         </form>
         <div class="switch-row">
           还没有账号？<a id="toRegister">立即注册</a>
+        </div>
+        </div>
+
+        <!-- 新手插件下载提示 -->
+        <div style="margin-top:22px;padding:16px;background:rgba(88,166,255,0.06);border:1px solid rgba(88,166,255,0.25);border-radius:10px;">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px;">🆕 新手必装：MOSS VSCode 插件</div>
+          <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px;">语法高亮 · 编译检查 · 运行对战，让 Bot 开发更高效</div>
+          <a href="download.html" class="primary-btn" style="text-decoration:none;display:inline-block;padding:8px 20px;font-size:13px;">📦 前往下载</a>
+        </div>
+
+        <!-- 管理员入口 -->
+        <div id="adminLoginBox" class="role-entry hidden">
+          <div class="entry-icon">🔑</div>
+          <div class="entry-title">管理员登录</div>
+          <div class="entry-desc">使用管理员账号、密码 A、密码 B 及专属口令登录</div>
+          <a href="admin.html" class="primary-btn" style="text-decoration:none;display:block;text-align:center;margin-top:18px;">前往管理员登录</a>
+          <div class="switch-row" style="margin-top:14px;">
+            不是管理员？<a onclick="switchRole('user')">返回用户登录</a>
+          </div>
+        </div>
+
+        <!-- 超管入口 -->
+        <div id="superLoginBox" class="role-entry hidden">
+          <div class="entry-icon">🛡️</div>
+          <div class="entry-title">超管登录</div>
+          <div class="entry-desc">五重验证：用户名 + 密码A + 密码B + 邮箱A + 邮箱B + 邮箱验证码</div>
+          <a href="super-admin.html" class="primary-btn" style="text-decoration:none;display:block;text-align:center;margin-top:18px;background:linear-gradient(90deg,var(--danger),#ff6b5e);">前往超管登录</a>
+          <div class="switch-row" style="margin-top:14px;">
+            <a onclick="switchRole('user')">返回用户登录</a>
+          </div>
         </div>
       </div>
     </div>
@@ -707,13 +772,21 @@
       $('tourCount').textContent = r.tournaments.length;
       list.innerHTML = r.tournaments.map(t => {
         const d = new Date(t.createdAt);
-        return `<div class="user-row">
+        const payoff = t.mossPayoff || {T:5,R:3,P:1,S:0};
+        const botCount = (t.mossBots || []).length;
+        const submitted = (t.mossBots || []).some(b => b.userId === currentUser?.id);
+        return `<div class="user-row" style="flex-wrap:wrap;gap:8px;">
           <div class="avatar" style="background:linear-gradient(135deg,var(--accent),var(--accent-2));">${t.title.charAt(0).toUpperCase()}</div>
-          <div class="user-info">
-            <div class="user-name">${t.title}${t.gameType ? ' <span style="color:var(--func);font-size:11px;">[' + t.gameType + ']</span>' : ''}</div>
-            <div class="user-email" style="color:var(--tag);">${t.winCondition.slice(0,60)}${t.winCondition.length>60?'...':''}</div>
+          <div class="user-info" style="min-width:200px;">
+            <div class="user-name">${t.title}${t.gameType ? ' <span style="color:var(--func);font-size:11px;">[' + t.gameType + ']</span>' : ''}
+              <span style="font-size:11px;color:${t.status==='active'?'var(--tag)':'var(--muted)'};margin-left:6px;">${t.status==='active'?'报名中':t.status==='running'?'比赛中':t.status==='completed'?'已结束':'已取消'}</span>
+            </div>
+            <div class="user-email" style="color:var(--tag);">${t.winCondition.slice(0,50)}${t.winCondition.length>50?'...':''}</div>
+            <div class="user-email" style="color:var(--accent);font-size:11px;">⚙ ${t.mossMode==='round-robin'?'循环赛':'1v1随机'} · ${t.mossRounds||100}轮 · T${payoff.T}/R${payoff.R}/P${payoff.P}/S${payoff.S} · ${botCount}人已提交</div>
           </div>
-          <div class="user-time">by ${t.createdBy}</div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            ${t.status==='active' ? `<button class="back-btn" style="padding:6px 14px;font-size:12px;border-color:var(--accent-2);color:var(--accent-2);" onclick="submitBotToTour('${t.id}','${t.title.replace(/'/g,"\\'")}')">${submitted?'更新 Bot':'提交 Bot'}</button>` : ''}
+          </div>
         </div>`;
       }).join('');
     } else {
@@ -721,6 +794,18 @@
       list.innerHTML = '<div class="user-row"><div class="user-info" style="color:var(--muted);font-size:13px;">暂无赛事</div></div>';
     }
   }
+
+  // 提交 Bot 到赛事
+  window.submitBotToTour = (tourId, tourTitle) => {
+    const code = prompt(`提交 Bot 到「${tourTitle}」\n\n请粘贴你的 .moss 代码（必须包含 main() 和 choose()）：`,
+      `def main():\n    choose("cooperate")`);
+    if (code === null) return;
+    if (!code.trim()) { toast('代码不能为空', 'error'); return; }
+    const name = prompt('给你的 Bot 起个名字：', currentUser?.username + '_bot') || 'myBot';
+    const r = DB.submitBot({ tournamentId: tourId, botName: name, botCode: code });
+    if (r.ok) { toast(r.msg, 'success'); loadTournaments(); }
+    else toast(r.msg, 'error');
+  };
 
   function loadApplyStatus() {
     const r = DB.adminApplyStatus();
@@ -782,6 +867,18 @@
   $('toLogin').addEventListener('click', goLogin);
   $('toForgot').addEventListener('click', goForgot);
   $('forgotToLogin').addEventListener('click', goLogin);
+
+  // 角色切换
+  function switchRole(role) {
+    document.querySelectorAll('.role-tab').forEach(t => t.classList.toggle('active', t.dataset.role === role));
+    $('userLoginBox').classList.toggle('hidden', role !== 'user');
+    $('adminLoginBox').classList.toggle('hidden', role !== 'admin');
+    $('superLoginBox').classList.toggle('hidden', role !== 'super');
+  }
+  document.querySelectorAll('.role-tab').forEach(t => {
+    t.addEventListener('click', () => switchRole(t.dataset.role));
+  });
+
   $('logoutBtn').addEventListener('click', () => {
     currentUser = null;
     DB.clearSession();

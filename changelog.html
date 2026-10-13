@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>更新日志 - 编程有趣游戏赛事</title>
+<style>
+  :root{--bg-0:#0a0e14;--bg-1:#0f1620;--bg-2:#131c28;--line:#1f2a37;--text:#e6edf3;--muted:#7d8b9a;--keyword:#ff7b72;--func:#d2a8ff;--str:#a5d6ff;--tag:#7ee787;--num:#f2cc60;--accent:#58a6ff;--danger:#f85149;--shadow:0 20px 60px rgba(0,0,0,.5)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{min-height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);background:radial-gradient(1200px 800px at 20% -10%,#16223a 0%,transparent 60%),radial-gradient(900px 700px at 110% 110%,#1a2b1e 0%,transparent 55%),linear-gradient(180deg,var(--bg-0),var(--bg-1))}
+  .mono{font-family:"JetBrains Mono","Fira Code","Cascadia Code","Consolas",monospace}
+  .grid-bg{position:fixed;inset:0;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:44px 44px;opacity:.18;mask-image:radial-gradient(circle at 50% 40%,#000 0%,transparent 75%);pointer-events:none;z-index:0}
+  header{position:fixed;top:0;left:0;right:0;height:60px;display:flex;align-items:center;padding:0 28px;border-bottom:1px solid var(--line);background:rgba(10,14,20,.72);backdrop-filter:blur(12px);z-index:10}
+  .brand{display:flex;align-items:center;font-size:17px;font-weight:600;cursor:pointer}
+  .brand .hash{color:var(--num)}.brand .bl{color:var(--accent)}.brand .sl{color:var(--muted)}.brand .cn{color:var(--text);margin:0 2px}
+  .header-right{margin-left:auto;display:flex;align-items:center;gap:14px;color:var(--muted);font-size:13px}
+  .header-right a{color:var(--accent);text-decoration:none}
+  .header-right a:hover{text-decoration:underline}
+  main{min-height:100%;padding:80px 24px 40px;position:relative;z-index:1;max-width:860px;margin:0 auto}
+  .card{background:linear-gradient(180deg,rgba(19,28,40,.92),rgba(15,22,32,.92));border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:24px}
+  .card-top{display:flex;align-items:center;gap:7px;padding:13px 16px;border-bottom:1px solid var(--line);background:rgba(0,0,0,.2)}
+  .wd{width:12px;height:12px;border-radius:50%}.dr{background:#ff5f57}.dy{background:#febc2e}.dg{background:#28c840}
+  .card-top .title{margin-left:8px;color:var(--muted);font-size:12.5px}
+  .card-body{padding:28px}
+  h1{font-size:26px;margin-bottom:8px}
+  .subtitle{color:var(--muted);font-size:14px;margin-bottom:28px;line-height:1.7}
+  .release{position:relative;padding-left:28px;padding-bottom:30px;border-left:2px solid var(--line)}
+  .release:last-child{border-left-color:transparent;padding-bottom:0}
+  .release::before{content:'';position:absolute;left:-8px;top:4px;width:14px;height:14px;border-radius:50%;background:var(--bg-2);border:2px solid var(--muted)}
+  .release.current::before{border-color:var(--tag);background:var(--tag);box-shadow:0 0 0 4px rgba(126,231,135,.15)}
+  .rel-head{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px}
+  .ver{font-size:19px;font-weight:700;color:var(--accent)}
+  .rel-date{color:var(--muted);font-size:12.5px}
+  .badge{padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid}
+  .badge-now{color:var(--tag);border-color:rgba(126,231,135,.45);background:rgba(126,231,135,.1)}
+  .badge-old{color:var(--muted);border-color:var(--line);background:var(--bg-2)}
+  .rel-title{font-size:14.5px;font-weight:600;margin-bottom:12px;color:var(--text)}
+  .rel-list{list-style:none;display:flex;flex-direction:column;gap:9px}
+  .rel-list li{position:relative;padding-left:18px;color:var(--muted);font-size:13.5px;line-height:1.65}
+  .rel-list li::before{content:'▸';position:absolute;left:0;color:var(--accent)}
+  .rel-list li b{color:var(--text);font-weight:600}
+  .rel-list code{background:var(--bg-2);padding:2px 7px;border-radius:4px;color:var(--str);font-size:12.5px;font-family:"JetBrains Mono","Consolas",monospace}
+  .tag-feat{color:var(--tag);font-weight:600}
+  .tag-fix{color:var(--num);font-weight:600}
+  .tag-break{color:var(--danger);font-weight:600}
+  .doc-list{display:flex;flex-direction:column;gap:12px}
+  .doc-item{display:flex;align-items:center;gap:16px;padding:16px 18px;background:var(--bg-2);border:1px solid var(--line);border-radius:10px;text-decoration:none;color:var(--text);transition:all .18s}
+  .doc-item:hover{border-color:var(--accent);background:rgba(88,166,255,.06);transform:translateX(2px)}
+  .doc-icon{font-size:26px;flex-shrink:0}
+  .doc-info{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
+  .doc-name{font-size:15px;font-weight:600;font-family:"JetBrains Mono","Consolas",monospace}
+  .doc-desc{font-size:12.5px;color:var(--muted);line-height:1.5}
+  .doc-open{color:var(--accent);font-size:13px;font-weight:600;white-space:nowrap;flex-shrink:0}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<header>
+  <div class="brand mono" onclick="location.href='index.html'">
+    <span class="hash">#</span><span class="bl">&lt;</span><span class="sl">/</span><span class="bl">&gt;</span><span class="cn">更新日志</span><span class="bl">&lt;</span><span class="sl">/</span><span class="bl">&gt;</span>
+  </div>
+  <div class="header-right">
+    <a href="download.html">📦 插件下载</a>
+    <a href="index.html">返回主站</a>
+  </div>
+</header>
+
+<main>
+  <div class="card">
+    <div class="card-top"><span class="wd dr"></span><span class="wd dy"></span><span class="wd dg"></span><span class="title mono">CHANGELOG.md</span></div>
+    <div class="card-body">
+      <h1>更新日志</h1>
+      <p class="subtitle">MOSS 语言与赛事平台的版本更新记录，最新版本排在最前。</p>
+
+      <div class="release current">
+        <div class="rel-head">
+          <span class="ver mono">v1.0.0</span>
+          <span class="badge badge-now">当前版本</span>
+          <span class="rel-date">2026-10-06</span>
+        </div>
+        <div class="rel-title">MOSS 通用博弈语言正式版</div>
+        <ul class="rel-list">
+          <li><span class="tag-break">重大变更</span>：MOSS 改为<b>通用博弈语言</b>，不再绑定囚徒困境。所有游戏规则由管理员的<b>裁判代码</b>定义。</li>
+          <li><span class="tag-feat">新增</span>：<code>choose()</code> 接受<b>任意值</b>（如 <code>"rock"</code>、<code>"all-in"</code>），含义完全由裁判解释，可玩石头剪刀布、赌博等任意游戏。</li>
+          <li><span class="tag-feat">新增</span>：<b>裁判代码</b>机制 —— 管理员发布赛事时编写隐藏评判代码，赛后自动执行，通过 <code>P1</code>/<code>P2</code>（dict：name/score/choices）裁定胜者与得分。</li>
+          <li><span class="tag-feat">新增</span>：单败淘汰赛制 —— 随机配对，淘汰输的一半，奇数时额外踢掉最低分者，直到剩 1 人。</li>
+          <li><span class="tag-feat">新增</span>：<code>main()</code> 中设置 <code>final_choose="策略函数名"</code> 指定参赛策略，无 <code>main()</code> 无法发布。</li>
+          <li><span class="tag-feat">新增</span>：<code>play(botA, botB, rounds)</code> 内部对战训练，返回每轮双方选择，计分由 Bot 自行计算。</li>
+          <li><span class="tag-fix">修复</span>：字典字面量 <code>{}</code> 解析、<code>not in</code> / <code>is not</code> 运算符。</li>
+          <li><span class="tag-fix">修复</span>：<code>choose()</code> 现在相当于 <code>return</code>，调用后函数立即结束。</li>
+        </ul>
+      </div>
+
+      <div class="release">
+        <div class="rel-head">
+          <span class="ver mono">v0.9.0</span>
+          <span class="badge badge-old">历史版本</span>
+          <span class="rel-date">2026-10-05</span>
+        </div>
+        <div class="rel-title">插件下载页与赛事流程完善</div>
+        <ul class="rel-list">
+          <li><span class="tag-feat">新增</span>：VSCode 插件下载页，新手必装指引（下载 → Install from VSIX → 重启）。</li>
+          <li><span class="tag-feat">新增</span>：邮箱验证码流程（注册 / 找回密码 / 管理员与超管登录）。</li>
+          <li><span class="tag-feat">新增</span>：管理员发布赛事、玩家提交 Bot、系统随机匹配并运行对战。</li>
+        </ul>
+      </div>
+
+      <div class="release">
+        <div class="rel-head">
+          <span class="ver mono">v0.8.0</span>
+          <span class="badge badge-old">历史版本</span>
+          <span class="rel-date">2026-10-04</span>
+        </div>
+        <div class="rel-title">MOSS 语言与 VSCode 插件初版</div>
+        <ul class="rel-list">
+          <li><span class="tag-feat">新增</span>：MOSS 解释器（词法 / 语法 / 解释执行），沙盒限制步数与递归深度。</li>
+          <li><span class="tag-feat">新增</span>：VSCode 插件 —— 语法高亮、编译检查、运行对战。</li>
+          <li><span class="tag-feat">新增</span>：用户 / 管理员 / 超管三级账号体系，基于 localStorage 的数据层。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-top"><span class="wd dr"></span><span class="wd dy"></span><span class="wd dg"></span><span class="title mono">docs/</span></div>
+    <div class="card-body">
+      <h1 style="font-size:22px;">文档阅读</h1>
+      <p class="subtitle">点击条目在新标签页打开，直接在浏览器中阅读全文。</p>
+      <div class="doc-list">
+        <a class="doc-item" href="MOSS语法说明.txt" target="_blank" rel="noopener">
+          <span class="doc-icon">📘</span>
+          <span class="doc-info">
+            <span class="doc-name">MOSS语法说明.txt</span>
+            <span class="doc-desc">MOSS 语言完整语法手册：语法、内置函数、裁判代码、完整示例</span>
+          </span>
+          <span class="doc-open">阅读 →</span>
+        </a>
+        <a class="doc-item" href="项目说明.txt" target="_blank" rel="noopener">
+          <span class="doc-icon">📄</span>
+          <span class="doc-info">
+            <span class="doc-name">项目说明.txt</span>
+            <span class="doc-desc">项目整体说明、赛事玩法与部署指引</span>
+          </span>
+          <span class="doc-open">阅读 →</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</main>
+</body>
+</html>
