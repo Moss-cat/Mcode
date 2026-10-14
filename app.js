@@ -224,7 +224,7 @@ const DB = (() => {
     const code = genCode();
     const data = { code, type, expires: now() + 5 * 60 * 1000 };
     localStorage.setItem(codeKey(email), JSON.stringify(data));
-    return code; // 直接返回，由调用方在页面显示
+    return code;
   }
   function getCode(email) {
     try {
@@ -237,7 +237,7 @@ const DB = (() => {
   function clearCode(email) { localStorage.removeItem(codeKey(email)); }
 
   // 后端可用时真实发送一封邮件（异步等待结果）
-  // 返回 true 表示邮件已成功送达；false 表示未启用同步或发送失败（调用方应回退到页内显示）
+  // 返回 true 表示邮件已成功送达；false 表示未启用同步或发送失败
   async function mailCode(email, code) {
     if (!syncEnabled) return false;
     try {
@@ -262,7 +262,7 @@ const DB = (() => {
     const code = setCode(email, 'register');
     const sent = await mailCode(email, code);
     if (sent) return { ok: true, msg: '验证码已发送至邮箱，请查收' };
-    return { ok: true, code, msg: '邮件发送失败，验证码：' + code + '（页内显示）' };
+    return { ok: false, msg: '验证码邮件发送失败，请稍后重试' };
   }
 
   // 忘记密码验证码
@@ -272,7 +272,7 @@ const DB = (() => {
     const code = setCode(email, 'reset');
     const sent = await mailCode(email, code);
     if (sent) return { ok: true, msg: '验证码已发送至邮箱，请查收' };
-    return { ok: true, code, msg: '邮件发送失败，验证码：' + code + '（页内显示）' };
+    return { ok: false, msg: '验证码邮件发送失败，请稍后重试' };
   }
 
   // 注册
@@ -363,7 +363,7 @@ const DB = (() => {
     const code = setCode(email, 'admin');
     const sent = await mailCode(email, code);
     if (sent) return { ok: true, msg: '验证码已发送至邮箱，请查收' };
-    return { ok: true, code, msg: '邮件发送失败，验证码：' + code + '（页内显示）' };
+    return { ok: false, msg: '验证码邮件发送失败，请稍后重试' };
   }
 
   // 管理员三重验证登录
@@ -552,7 +552,7 @@ const DB = (() => {
     const code = setCode(email, 'super');
     const sent = await mailCode(email, code);
     if (sent) return { ok: true, msg: '验证码已发送至 ' + email + '，请查收' };
-    return { ok: true, code, msg: '邮件发送失败，验证码：' + code + '（页内显示）' };
+    return { ok: false, msg: '验证码邮件发送失败，请稍后重试' };
   }
 
   // 超管四重验证：用户名 + 密码A + 密码B + 邮箱验证码
