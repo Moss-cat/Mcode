@@ -20,12 +20,11 @@
 index.html        主站：登录 / 注册 / 忘记密码 / 欢迎页
 admin.html        管理员页：3 重验证 + 赛事发布 + 踢人申请
 super-admin.html  超管页：6 重验证 + 用户管理 + 审批 + 赛事管理
-app.js            前端数据层（密码用大小写感知摩斯变体存储）
+app.js            前端数据层
 moss.js           MOSS 语言解释器 + 囚徒困境博弈引擎
 moss-arena.html   MOSS 博弈试玩页（代码编辑器 + 对战可视化）
 server.js         可选 Node 后端：静态托管 + 跨设备键值同步 + 发码接口
-mailer.js         163 SMTP 发信模块（授权码以摩斯变体密文存储，零依赖）
-.nojekyll         GitHub Pages 直出配置（部署必需）
+mailer.js         163 SMTP 发信模块
 
 
 三、MOSS 语言语法

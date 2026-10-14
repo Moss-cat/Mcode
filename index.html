@@ -690,12 +690,12 @@
   });
 
   // ===== 注册：发送验证码 =====
-  $('regSendCode').addEventListener('click', () => {
+  $('regSendCode').addEventListener('click', async () => {
     const email = $('regEmail').value.trim();
     if (!email) { toast('请先填写邮箱', 'error'); return; }
-    const r = DB.sendRegisterCode(email);
+    const r = await DB.sendRegisterCode(email);
     if (r.ok) {
-      toast('验证码：' + r.code + '（页内显示，无邮件发送）', 'success');
+      toast(r.msg, 'success');
       startCountdown($('regSendCode'));
     } else {
       toast(r.msg || '发送失败', 'error');
@@ -719,14 +719,14 @@
   });
 
   // ===== 忘记密码：发送验证码 =====
-  $('forgotSendCode').addEventListener('click', () => {
+  $('forgotSendCode').addEventListener('click', async () => {
     const email = $('forgotEmail').value.trim();
     if (!email) { toast('请先填写邮箱', 'error'); return; }
     $('forgotMaskedEmail').textContent = maskEmail(email);
     $('forgotSendingTip').classList.add('show');
-    const r = DB.sendResetCode(email);
+    const r = await DB.sendResetCode(email);
     if (r.ok) {
-      toast('验证码：' + r.code + '（页内显示，无邮件发送）', 'success');
+      toast(r.msg, 'success');
       startCountdown($('forgotSendCode'));
     } else {
       toast(r.msg || '发送失败', 'error');

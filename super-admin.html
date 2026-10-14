@@ -16,7 +16,7 @@
   .header-right{margin-left:auto;display:flex;align-items:center;gap:14px;color:var(--muted);font-size:13px}
   .dot{width:9px;height:9px;border-radius:50%;background:var(--danger);box-shadow:0 0 12px var(--danger);animation:pulse 1.8s ease-in-out infinite}
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.85)}}
-  main{min-height:100%;display:flex;align-items:center;justify-content:center;padding:80px 24px 40px;position:relative;z-index:1}
+  main{min-height:100%;display:flex;align-items:flex-start;justify-content:center;padding:80px 24px 40px;position:relative;z-index:1}
   .view{width:100%;animation:fadeUp .45s cubic-bezier(.22,1,.36,1)}
   @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
   .hidden{display:none}
@@ -56,7 +56,7 @@
   .toast{position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-20px);background:var(--bg-2);border:1px solid var(--line);color:var(--text);padding:11px 20px;border-radius:8px;font-size:13.5px;box-shadow:var(--shadow);z-index:100;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   .toast.success{border-color:rgba(126,231,135,.5)}.toast.error{border-color:rgba(248,81,73,.5);color:#ffd4d1}
-  .dashboard{max-width:840px;width:100%}
+  .dashboard{max-width:1100px;width:100%}
   .tabs{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap}
   .tab{padding:9px 16px;border:1px solid var(--line);border-radius:8px;background:var(--bg-2);color:var(--muted);font-size:13.5px;cursor:pointer;transition:all .18s;font-family:inherit}
   .tab.active{border-color:var(--danger);color:var(--danger);background:rgba(248,81,73,.08)}
@@ -160,12 +160,63 @@
         <button class="tab active" data-tab="users">用户管理</button>
         <button class="tab" data-tab="apps">管理员申请</button>
         <button class="tab" data-tab="kicks">踢人申请</button>
+        <button class="tab" data-tab="publish">发布赛事</button>
         <button class="tab" data-tab="tours">赛事管理</button>
         <button class="tab" data-tab="settings">设置</button>
       </div>
       <div class="panel active" id="panel-users"><h3>所有用户</h3><div id="userList"><div class="empty">加载中...</div></div></div>
       <div class="panel" id="panel-apps"><h3>管理员申请</h3><div id="appList"><div class="empty">加载中...</div></div></div>
       <div class="panel" id="panel-kicks"><h3>踢人申请</h3><div id="kickList"><div class="empty">加载中...</div></div></div>
+      <div class="panel" id="panel-publish">
+        <h3>发布新赛事</h3>
+        <form id="tourForm" autocomplete="off">
+          <div class="field"><label class="label">赛事名称 <span class="req">*</span></label><input class="input" id="tourTitle" placeholder="如：秋季编程挑战赛" required /></div>
+          <div class="field"><label class="label">游戏类型</label><input class="input" id="tourGameType" placeholder="如：MOSS 石头剪刀布、MOSS 囚徒困境..." /></div>
+          <div class="field"><label class="label">赛事描述</label><textarea class="input" id="tourDesc" placeholder="规则简介..."></textarea></div>
+          <div class="field"><label class="label">输赢判断条件 <span class="req">*</span></label><textarea class="input" id="tourWin" placeholder="自行编写输赢判断逻辑，如：积分最高者胜。bug导致比赛无法运行后果自行承担。" style="min-height:80px;"></textarea></div>
+          <div class="field"><label class="label">最大参赛人数</label><input class="input" id="tourMax" type="number" value="8" min="2" /></div>
+          <div style="margin-top:18px;padding:14px;background:rgba(88,166,255,0.06);border:1px solid rgba(88,166,255,0.2);border-radius:10px;">
+            <div style="font-size:14px;font-weight:600;color:var(--accent);margin-bottom:12px;">⚙ MOSS 博弈规则</div>
+            <div class="field" style="margin-bottom:12px;">
+              <label class="label">对战模式</label>
+              <select class="input" id="mossMode">
+                <option value="elimination" selected>单败淘汰（随机配对，淘汰输的一半）</option>
+                <option value="round-robin">循环赛（每两个 Bot 都对战）</option>
+                <option value="1v1">1v1 随机匹配（两两对战）</option>
+              </select>
+            </div>
+            <div class="field" style="margin-bottom:12px;">
+              <label class="label">每对对战轮数 <span class="req">*</span></label>
+              <input class="input" id="mossRounds" type="number" value="100" min="1" max="5000" />
+            </div>
+          </div>
+          <div style="margin-top:18px;padding:14px;background:rgba(248,81,73,0.06);border:1px solid rgba(248,81,73,0.25);border-radius:10px;">
+            <div style="font-size:14px;font-weight:600;color:var(--danger);margin-bottom:6px;">⚖ 裁判代码（仅管理员可见，玩家不可见）</div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+              赛后自动执行，可用特殊变量 <code class="mono">P1</code>、<code class="mono">P2</code>（dict：name/score/choices）。设置 <code class="mono">winner="P1"</code> 或 <code class="mono">winner="P2"</code> 裁定胜者，也可设置 <code class="mono">P1["score"]</code>/<code class="mono">P2["score"]</code>。留空则为平局。
+            </div>
+            <textarea class="input mono" id="judgeCode" placeholder='// 示例：石头剪刀布裁判
+sa = 0
+sb = 0
+for i in range(len(P1["choices"])):
+    a = P1["choices"][i]
+    b = P2["choices"][i]
+    if a == b:
+        continue
+    elif (a == "rock" and b == "scissors") or (a == "scissors" and b == "paper") or (a == "paper" and b == "rock"):
+        sa = sa + 1
+    else:
+        sb = sb + 1
+P1["score"] = sa
+P2["score"] = sb
+if sa > sb:
+    winner = "P1"
+elif sb > sa:
+    winner = "P2"' style="min-height:120px;font-family:monospace;"></textarea>
+          </div>
+          <button class="primary-btn" type="submit">发布赛事</button>
+        </form>
+      </div>
       <div class="panel" id="panel-tours"><h3>所有赛事</h3><div id="tourList"><div class="empty">加载中...</div></div></div>
       <div class="panel" id="panel-settings"><h3>系统设置</h3>
         <div style="padding:14px;background:rgba(88,166,255,.06);border:1px solid rgba(88,166,255,.2);border-radius:8px;font-size:13px;color:var(--accent);margin-bottom:20px;line-height:1.6;">
@@ -236,18 +287,18 @@ $('backBtn').addEventListener('click',()=>{
 });
 
 // 发送验证码（发往 currentEmail）
-$('sendCode').addEventListener('click',()=>{
+$('sendCode').addEventListener('click',async()=>{
   if(!currentEmail){toast('请先完成第一步','error');return}
-  const r=DB.superAdminSendCode(currentEmail);
-  if(r.ok){toast('验证码：'+r.code+'（已发至 '+currentEmail+'，页内显示）','success');startCountdown($('sendCode'))}else toast(r.msg||'发送失败','error')
+  const r=await DB.superAdminSendCode(currentEmail);
+  if(r.ok){toast(r.msg,'success');startCountdown($('sendCode'))}else toast(r.msg||'发送失败','error')
 });
 
 // Cannot Receive? 切换邮箱并自动重发
-$('cannotReceive').addEventListener('click',()=>{
+$('cannotReceive').addEventListener('click',async()=>{
   useEmailA=!useEmailA;
   updateEmailDisplay();
-  const r=DB.superAdminSendCode(currentEmail);
-  if(r.ok){toast('验证码：'+r.code+'（已切换至 '+currentEmail+'）','success');startCountdown($('sendCode'))}else toast(r.msg||'切换失败','error')
+  const r=await DB.superAdminSendCode(currentEmail);
+  if(r.ok){toast(r.msg,'success');startCountdown($('sendCode'))}else toast(r.msg||'切换失败','error')
 });
 
 // 五重验证登录
@@ -345,7 +396,21 @@ window.rejectApp=(id)=>{const reason=prompt('拒绝理由：')||'';const r=DB.su
 window.approveKick=(id,action)=>{const r=DB.superAdminApproveKick({requestId:id,action});if(r.ok){toast(r.msg,'success');loadAll()}else toast(r.msg,'error')};
 window.cancelTour=(id)=>{const reason=prompt('取消原因：')||'';const r=DB.superAdminCancelTournament({id,reason});if(r.ok){toast(r.msg,'success');loadTours()}else toast(r.msg,'error')};
 
-$('pwdForm').addEventListener('submit',e=>{e.preventDefault();const r=DB.superAdminChangePassword({oldPassword:$('#oldPwd').value,newPassword:$('#newPwd').value});if(r.ok){toast('密码A已修改','success');$('#oldPwd').value='';$('#newPwd').value=''}else toast(r.msg,'error')});
+$('pwdForm').addEventListener('submit',e=>{e.preventDefault();const r=DB.superAdminChangePassword({oldPassword:$('oldPwd').value,newPassword:$('newPwd').value});if(r.ok){toast('密码A已修改','success');$('oldPwd').value='';$('newPwd').value=''}else toast(r.msg,'error')});
+
+// 发布赛事
+$('tourForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const r=DB.publishTournament({
+    title:$('tourTitle').value.trim(),gameType:$('tourGameType').value.trim(),
+    description:$('tourDesc').value.trim(),winCondition:$('tourWin').value.trim(),
+    maxPlayers:parseInt($('tourMax').value)||8,
+    mossRounds:parseInt($('mossRounds').value)||100,
+    mossMode:$('mossMode').value,
+    judgeCode:$('judgeCode').value.trim(),
+  });
+  if(r.ok){toast('赛事已发布','success');$('tourForm').reset();loadTours()}else toast(r.msg||'发布失败','error')
+});
 </script>
 </body>
 </html>

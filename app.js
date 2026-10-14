@@ -185,7 +185,9 @@ const DB = (() => {
 
   // ===== 用户操作 =====
   const users = {
-    all: () => read(K.users, []),
+    // raw 包含 _deleted 墓碑标记；all 对外隐藏墓碑
+    raw: () => read(K.users, []),
+    all() { return this.raw().filter(u => !u || !u._deleted); },
     findByUsername(name) { return this.all().find(u => u.username === name); },
     findByEmail(email) { return this.all().find(u => u.email === email); },
     findById(id) { return this.all().find(u => u.id === id); },
@@ -193,14 +195,14 @@ const DB = (() => {
       return this.all().find(u => u.username === acc || u.email === acc);
     },
     add(u) {
-      const arr = this.all();
+      const arr = this.raw();
       arr.push(u);
       write(K.users, arr);
       return u;
     },
     update(id, patch) {
-      const arr = this.all();
-      const i = arr.findIndex(u => u.id === id);
+      const arr = this.raw();
+      const i = arr.findIndex(u => u.id === id && !u._deleted);
       if (i >= 0) {
         arr[i] = { ...arr[i], ...patch };
         write(K.users, arr);
@@ -209,7 +211,9 @@ const DB = (() => {
       return null;
     },
     remove(id) {
-      const arr = this.all().filter(u => u.id !== id);
+      // 先移除目标，再写入一条 _deleted 墓碑标记，让同步两端都能按 id 删除该用户
+      const arr = this.raw().filter(u => u.id !== id || u._deleted);
+      arr.push({ id, _deleted: true });
       write(K.users, arr);
     },
   };
@@ -232,37 +236,43 @@ const DB = (() => {
   }
   function clearCode(email) { localStorage.removeItem(codeKey(email)); }
 
-  // 后端可用时顺带真发一封邮件（异步、不阻塞；失败仅记录日志）
-  // 返回是否走了邮件通道，供调用方决定提示文案；验证码仍返回给页面显示
-  function mailCode(email, code) {
+  // 后端可用时真实发送一封邮件（异步等待结果）
+  // 返回 true 表示邮件已成功送达；false 表示未启用同步或发送失败（调用方应回退到页内显示）
+  async function mailCode(email, code) {
     if (!syncEnabled) return false;
-    sync.sendMail(email, code).then(r => {
-      if (r && r.ok) return;
+    try {
+      const r = await sync.sendMail(email, code);
+      if (r && r.ok) return true;
       console.warn('[mail] 验证码邮件发送失败：' + ((r && r.msg) || '后端不可用'));
-    });
-    return true;
+      return false;
+    } catch (e) {
+      console.warn('[mail] 验证码邮件发送异常：' + (e && e.message));
+      return false;
+    }
   }
 
   // ===== 业务 API =====
 
   // 普通用户注册验证码
-  function sendRegisterCode(email) {
+  async function sendRegisterCode(email) {
     if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       return { ok: false, msg: '邮箱格式不正确' };
     }
     if (users.findByEmail(email)) return { ok: false, msg: '该邮箱已注册' };
     const code = setCode(email, 'register');
-    const viaMail = mailCode(email, code);
-    return { ok: true, code, msg: viaMail ? '验证码已发送至邮箱，请查收' : '验证码已生成（页面显示）' };
+    const sent = await mailCode(email, code);
+    if (sent) return { ok: true, msg: '验证码已发送至邮箱，请查收' };
+    return { ok: true, code, msg: '邮件发送失败，验证码：' + code + '（页内显示）' };
   }
 
   // 忘记密码验证码
-  function sendResetCode(email) {
+  async function sendResetCode(email) {
     if (!email) return { ok: false, msg: '请先填写邮箱' };
     if (!users.findByEmail(email)) return { ok: false, msg: '该邮箱未注册' };
     const code = setCode(email, 'reset');
-    const viaMail = mailCode(email, code);
-    return { ok: true, code, msg: viaMail ? '验证码已发送至邮箱，请查收' : '验证码已生成（页面显示）' };
+    const sent = await mailCode(email, code);
+    if (sent) return { ok: true, msg: '验证码已发送至邮箱，请查收' };
+    return { ok: true, code, msg: '邮件发送失败，验证码：' + code + '（页内显示）' };
   }
 
   // 注册
@@ -345,14 +355,15 @@ const DB = (() => {
   }
 
   // 管理员登录验证码
-  function sendAdminCode(email) {
+  async function sendAdminCode(email) {
     if (!email) return { ok: false, msg: '请先填写邮箱' };
     const u = users.findByEmail(email);
     if (!u) return { ok: false, msg: '该邮箱不存在' };
     if (u.role !== 'admin') return { ok: false, msg: '该账号非管理员' };
     const code = setCode(email, 'admin');
-    const viaMail = mailCode(email, code);
-    return { ok: true, code, msg: viaMail ? '验证码已发送至邮箱，请查收' : '验证码已生成（页面显示）' };
+    const sent = await mailCode(email, code);
+    if (sent) return { ok: true, msg: '验证码已发送至邮箱，请查收' };
+    return { ok: true, code, msg: '邮件发送失败，验证码：' + code + '（页内显示）' };
   }
 
   // 管理员三重验证登录
@@ -386,7 +397,7 @@ const DB = (() => {
   function publishTournament({ title, gameType, description, winCondition, maxPlayers, mossRounds, mossMode, judgeCode }) {
     const s = getSession();
     if (!s) return { ok: false, msg: '请先登录' };
-    if (s.role !== 'admin') return { ok: false, msg: '仅管理员可发布' };
+    if (s.role !== 'admin' && s.role !== 'superadmin') return { ok: false, msg: '仅管理员或超管可发布' };
     if (!title) return { ok: false, msg: '请填写赛事名称' };
     if (!winCondition) return { ok: false, msg: '请填写输赢条件（你自行编写，bug导致比赛无法运行后果自负）' };
     const arr = read(K.tours, []);
@@ -533,14 +544,15 @@ const DB = (() => {
   }
 
   // 超管邮箱验证码：可发送至主邮箱 A 或备份邮箱 B
-  function superAdminSendCode(email) {
+  async function superAdminSendCode(email) {
     const s = getSettings();
     if (email !== s.superAdminEmail && email !== s.superAdminEmailBackup) {
       return { ok: false, msg: '邮箱不匹配超管邮箱' };
     }
     const code = setCode(email, 'super');
-    const viaMail = mailCode(email, code);
-    return { ok: true, code, msg: viaMail ? '验证码已发送至邮箱，请查收' : '验证码已生成（页面显示）' };
+    const sent = await mailCode(email, code);
+    if (sent) return { ok: true, msg: '验证码已发送至 ' + email + '，请查收' };
+    return { ok: true, code, msg: '邮件发送失败，验证码：' + code + '（页内显示）' };
   }
 
   // 超管四重验证：用户名 + 密码A + 密码B + 邮箱验证码
@@ -694,13 +706,45 @@ const DB = (() => {
   // 故此时直接禁用同步，静默退回纯本地模式
   const canSync = (typeof location !== 'undefined') && (location.protocol === 'http:' || location.protocol === 'https:');
 
-  // 把服务器返回 data 中的已同步键写入本地 localStorage（覆盖本地缓存）
+  // 按 id 合并两个数组（与后端 mergeArrays 对齐）：
+  // 新值覆盖同 id 旧记录；旧值独有记录保留；_deleted:true 的条目从结果中删除。
+  // _deleted 标记最后处理，确保同一轮合并中删除优先于新增。
+  function mergeArrays(oldArr, newArr) {
+    const map = new Map();
+    const tombstones = new Set();
+    let noIdIdx = 0;
+    const add = (item) => {
+      if (item && typeof item === 'object' && item.id != null) {
+        if (item._deleted) { tombstones.add(String(item.id)); return; }
+        map.set(String(item.id), item);
+      } else {
+        map.set('__noid__' + (noIdIdx++), item);
+      }
+    };
+    (oldArr || []).forEach(add);
+    (newArr || []).forEach(add);
+    tombstones.forEach(id => map.delete(id));
+    return Array.from(map.values());
+  }
+
+  // 把服务器返回 data 中的已同步键合并进本地 localStorage
+  // 数组按 id 合并（防 stale 覆盖）；对象浅合并；其它直接覆盖
   function applyServerData(data) {
     if (!data || typeof data !== 'object') return;
     SYNC_KEYS.forEach(k => {
-      if (Object.prototype.hasOwnProperty.call(data, k)) {
-        localStorage.setItem(k, JSON.stringify(data[k]));
+      if (!Object.prototype.hasOwnProperty.call(data, k)) return;
+      const incoming = data[k];
+      const local = read(k, Array.isArray(incoming) ? [] : {});
+      let merged;
+      if (Array.isArray(local) && Array.isArray(incoming)) {
+        merged = mergeArrays(local, incoming);
+      } else if (local && typeof local === 'object' && !Array.isArray(local) &&
+                 incoming && typeof incoming === 'object' && !Array.isArray(incoming)) {
+        merged = Object.assign({}, local, incoming);
+      } else {
+        merged = incoming;
       }
+      localStorage.setItem(k, JSON.stringify(merged));
     });
   }
 

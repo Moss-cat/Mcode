@@ -205,11 +205,11 @@ function pad(n){return n<10?'0'+n:''+n}
 function startCountdown(btn,s=60){let t=s;btn.disabled=true;btn.textContent=t+'s';const i=setInterval(()=>{t--;if(t<=0){clearInterval(i);btn.disabled=false;btn.textContent='发送验证码'}else btn.textContent=t+'s'},1000)}
 
 // 登录
-$('sendCode').addEventListener('click',()=>{
+$('sendCode').addEventListener('click',async()=>{
   const email=$('email').value.trim();
   if(!email){toast('请先填写邮箱','error');return}
-  const r=DB.sendAdminCode(email);
-  if(r.ok){toast('验证码：'+r.code+'（页内显示）','success');startCountdown($('sendCode'))}else toast(r.msg||'发送失败','error')
+  const r=await DB.sendAdminCode(email);
+  if(r.ok){toast(r.msg,'success');startCountdown($('sendCode'))}else toast(r.msg||'发送失败','error')
 });
 $('loginForm').addEventListener('submit',e=>{
   e.preventDefault();
