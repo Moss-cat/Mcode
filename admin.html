@@ -250,7 +250,10 @@ $('kickForm').addEventListener('submit',e=>{
   if(r.ok){toast('申请已提交','success');$('kickForm').reset();loadMyKicks()}else toast(r.msg||'提交失败','error')
 });
 
-function loadAll(){loadMyTournaments();loadMyKicks()}
+function loadAll(){DB.sync.ready.then(()=>{loadMyTournaments();loadMyKicks()})}
+
+// 服务器数据变化时自动刷新（仅在已进入控制台时）
+window.addEventListener('db:changed',()=>{if(!$('dashView').classList.contains('hidden'))loadAll()});
 function loadMyTournaments(){
   const r=DB.myTournaments();
   const box=$('myTourList');

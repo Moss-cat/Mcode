@@ -88,6 +88,13 @@
           <li><span class="tag-feat">新增</span>：<code>play(botA, botB, rounds)</code> 内部对战训练，返回每轮双方选择，计分由 Bot 自行计算。</li>
           <li><span class="tag-fix">修复</span>：字典字面量 <code>{}</code> 解析、<code>not in</code> / <code>is not</code> 运算符。</li>
           <li><span class="tag-fix">修复</span>：<code>choose()</code> 现在相当于 <code>return</code>，调用后函数立即结束。</li>
+          <li><span class="tag-feat">新增</span>：<b>163 邮箱 SMTP 接入</b> —— <code>mailer.js</code> 导出 <code>sendVerifyCode(to, code)</code>；注册 / 找回密码 / 管理员与超管登录的验证码改为<b>真实发信</b>（HTML + 纯文本双版本，5 分钟有效，底部注明请勿回复）。</li>
+          <li><span class="tag-feat">新增</span>：SMTP 授权码以<b>摩斯密码变体</b>密文存储，由 <code>getSmtpPass()</code> 还原；新变体支持大小写（段首 <code>1</code>=大写、<code>0</code>=小写），并修掉了点划互相污染的撞码问题。</li>
+          <li><span class="tag-feat">新增</span>：发信防护 —— 同一邮箱 60 秒内限一次、同一 IP 每小时限 10 次；发信异步不阻塞请求，失败抛错并记录日志。</li>
+          <li><span class="tag-feat">新增</span>：共享后端 <code>server.js</code> —— 用户 / 申请 / 赛事等数据落盘共享，超管可<b>实时</b>看到新申请（3 秒轮询）；后端缺失时自动退回纯本地模式。</li>
+          <li><span class="tag-feat">新增</span>：<code>data.json</code> 以<b>摩斯码</b>形式落盘，文件无法直接阅读。</li>
+          <li><span class="tag-feat">新增</span>：本更新日志页，以及网站内的文档阅读入口。</li>
+          <li><span class="tag-fix">修复</span>：用 <code>file://</code> 直接打开页面时的 <code>ERR_BLOCKED_BY_CLIENT</code> —— 非 http(s) 协议下自动跳过同步请求。</li>
         </ul>
       </div>
 

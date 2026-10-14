@@ -755,8 +755,8 @@
     $('headerRight').innerHTML = '<span class="dot"></span><span>' + currentUser.username + ' 已登录</span>';
     showView('welcome');
     updateTime();
-    loadTournaments();
-    loadApplyStatus();
+    // 等待共享数据拉取完成后再渲染，保证首屏使用服务器最新数据
+    DB.sync.ready.then(() => { loadTournaments(); loadApplyStatus(); });
     if (currentUser.role === 'user') {
       $('adminApplySection').style.display = 'block';
     } else {
@@ -885,6 +885,11 @@
     $('headerRight').innerHTML = '<span class="dot"></span><span>在线</span>';
     $('loginForm').reset();
     goLogin();
+  });
+
+  // 服务器数据变化时自动刷新（仅在已进入欢迎页时）
+  window.addEventListener('db:changed', () => {
+    if (!views.welcome.classList.contains('hidden')) { loadTournaments(); loadApplyStatus(); }
   });
 </script>
 

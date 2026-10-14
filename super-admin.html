@@ -271,7 +271,10 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
   t.classList.add('active');$('panel-'+t.dataset.tab).classList.add('active');
 }));
 
-function loadAll(){loadUsers();loadApps();loadKicks();loadTours()}
+function loadAll(){DB.sync.ready.then(()=>{loadUsers();loadApps();loadKicks();loadTours()})}
+
+// 服务器数据变化时自动刷新（仅在已进入控制台时）
+window.addEventListener('db:changed',()=>{if(!$('dashView').classList.contains('hidden'))loadAll()});
 
 function loadUsers(){
   const r=DB.superAdminUsers();

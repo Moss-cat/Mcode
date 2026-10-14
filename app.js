@@ -29,7 +29,11 @@ const DB = (() => {
     try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; }
     catch (e) { return def; }
   };
-  const write = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+  const write = (k, v) => {
+    localStorage.setItem(k, JSON.stringify(v));
+    // 同步键：在本地写入完成后，fire-and-forget 推送到共享后端（若同步已启用）
+    if (syncEnabled && SYNC_KEYS.indexOf(k) >= 0) pushOp(k, v);
+  };
   const uid = (p = 'id') => p + '_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
   const now = () => Date.now();
   const pad = (n) => (n < 10 ? '0' + n : '' + n);
@@ -55,9 +59,12 @@ const DB = (() => {
   // 6位安全 PIN
   const genPIN = () => String(Math.floor(100000 + Math.random() * 900000));
 
-  // ===== 摩斯密码编码（用于存储密码）=====
-  // 规则：字符 → 摩斯码 → "." 替换为 "-"，"-" 替换为 "=" → 各字符用 "|" 分隔
-  //       没有摩斯码的字符（空格、特殊符号等）保持原样，同样用 "|" 分隔
+  // ===== 摩斯密码变体（大小写感知，用于存储密码）=====
+  // 规则：字符 → 标准摩斯码 → 逐符号替换（"." 换 "-"，"-" 换 "="）
+  //       → 段首加 "1"（大写）/ "0"（小写）；各段用 "|" 分隔
+  //       没有摩斯码的字符（空格、其他符号等）原样保留，同样用 "|" 分隔
+  // 关键：替换必须「逐符号一次性」完成，不能全局先把 "." 换 "-" 再把 "-" 换 "="，
+  //       否则点与划会互相污染 —— 老实现正是因此既分不出大小写、又会撞码（B 与 H 同码）
   const MORSE = {
     'A':'.-','B':'-...','C':'-.-.','D':'-..','E':'.','F':'..-.','G':'--.','H':'....',
     'I':'..','J':'.---','K':'-.-','L':'.-..','M':'--','N':'-.','O':'---','P':'.--.',
@@ -69,46 +76,80 @@ const DB = (() => {
     '(':'-.--.',')':'-.--.-','&':'.-...',':':'---...',';':'-.-.-.','=':'-...-',
     '-':'-....-','+':'.-.-.','_':'..--.-','"':'.-..-.','$':'...-..-','@':'.--.-.',
   };
-  // 反向表：摩斯码 → 字符
   const MORSE_REV = {};
   Object.keys(MORSE).forEach(ch => { MORSE_REV[MORSE[ch]] = ch; });
 
-  // 编码：明文 → 摩斯变体字符串
+  const TO_CODE = { '.': '-', '-': '=' };    // 编码方向：点 → - ，划 → =
+  const FROM_CODE = { '-': '.', '=': '-' };  // 解码方向
+
+  // 编码：明文 → 新密文（大小写感知）
   function encodeMorse(text) {
+    if (text == null) return '';
+    return String(text).split('').map(ch => {
+      const m = MORSE[ch.toUpperCase()];
+      if (m === undefined) return ch; // 无摩斯码的字符原样保留
+      const body = m.split('').map(s => TO_CODE[s]).join('');
+      const isLower = (ch === ch.toLowerCase()) && (ch !== ch.toUpperCase());
+      return (isLower ? '0' : '1') + body;
+    }).join('|');
+  }
+
+  // 解码：新密文 → 明文（用于「解锁」）
+  function decodeMorse(encoded) {
+    if (encoded == null) return '';
+    return String(encoded).split('|').map(seg => {
+      if (seg === '') return '';
+      const m = /^([01])([-=]+)$/.exec(seg);
+      if (!m) return seg; // 非摩斯段，原样返回
+      const std = m[2].split('').map(s => FROM_CODE[s]).join('');
+      const ch = MORSE_REV[std];
+      if (ch === undefined) return seg;
+      return m[1] === '0' ? ch.toLowerCase() : ch;
+    }).join('');
+  }
+
+  // 旧版编码（存在撞码缺陷，仅用于兼容校验已存在的旧格式密文，不再用于新写入）
+  function encodeMorseOld(text) {
     if (text == null) return '';
     return String(text).split('').map(ch => {
       const up = ch.toUpperCase();
       const m = MORSE[up];
       if (m !== undefined) {
-        // 摩斯码里 "." → "-"，"-" → "="
         return m.replace(/\./g, '-').replace(/-/g, '=');
       }
-      // 无摩斯码的字符（空格、其他符号）保持原样
       return ch;
     }).join('|');
   }
 
-  // 解码：摩斯变体字符串 → 明文（用于「解锁」）
-  function decodeMorse(encoded) {
-    if (encoded == null) return '';
-    return String(encoded).split('|').map(seg => {
-      if (seg === '') return '';
-      // 只含 "-" 和 "=" 的段是摩斯码；其他原样返回
-      if (/^[-=]+$/.test(seg)) {
-        const m = seg.replace(/-/g, '.').replace(/=/g, '-');
-        return MORSE_REV[m] !== undefined ? MORSE_REV[m] : seg;
-      }
-      return seg;
-    }).join('');
+  // 判断 stored 是否为「旧格式」密文（含旧明文）
+  function isOldMorseFormat(stored) {
+    if (!stored) return false;
+    // 不含 "|" 也不含 "=" → 旧明文密码
+    if (!stored.includes('|') && !stored.includes('=')) return true;
+    // 任一段以 0/1 开头后跟 [-=] → 新格式；否则视为旧格式
+    const segs = String(stored).split('|');
+    return !segs.some(seg => /^[01][-=]+$/.test(seg));
   }
 
-  // 密码比对：把输入编码后与存储值比对（等价于「解锁存储值再对比」）
+  // 密码比对：兼容旧明文 / 旧格式 / 新格式
   function verifyMorse(input, stored) {
-    // 兼容旧明文密码：不含 "|" 和 "=" 的存储值视为旧明文，直接比对
-    if (stored && !stored.includes('|') && !stored.includes('=')) {
-      return input === stored;
+    if (stored == null) return false;
+    if (!stored.includes('|') && !stored.includes('=')) {
+      return input === stored; // 旧明文
+    }
+    if (isOldMorseFormat(stored)) {
+      return encodeMorseOld(input) === stored;
     }
     return encodeMorse(input) === stored;
+  }
+
+  // 透明升级：若 stored 为旧格式且 input 校验通过，返回新格式密文；否则原样返回
+  // 用于登录成功后把存量旧密文原地升级为新格式（不影响用户输入习惯）
+  function reencodeMorse(input, stored) {
+    if (stored == null) return stored;
+    if (!isOldMorseFormat(stored)) return stored;
+    if (!verifyMorse(input, stored)) return stored;
+    return encodeMorse(input);
   }
 
   // ===== 初始化（首次访问）=====
@@ -191,6 +232,17 @@ const DB = (() => {
   }
   function clearCode(email) { localStorage.removeItem(codeKey(email)); }
 
+  // 后端可用时顺带真发一封邮件（异步、不阻塞；失败仅记录日志）
+  // 返回是否走了邮件通道，供调用方决定提示文案；验证码仍返回给页面显示
+  function mailCode(email, code) {
+    if (!syncEnabled) return false;
+    sync.sendMail(email, code).then(r => {
+      if (r && r.ok) return;
+      console.warn('[mail] 验证码邮件发送失败：' + ((r && r.msg) || '后端不可用'));
+    });
+    return true;
+  }
+
   // ===== 业务 API =====
 
   // 普通用户注册验证码
@@ -200,7 +252,8 @@ const DB = (() => {
     }
     if (users.findByEmail(email)) return { ok: false, msg: '该邮箱已注册' };
     const code = setCode(email, 'register');
-    return { ok: true, code, msg: '验证码已生成（页面显示）' };
+    const viaMail = mailCode(email, code);
+    return { ok: true, code, msg: viaMail ? '验证码已发送至邮箱，请查收' : '验证码已生成（页面显示）' };
   }
 
   // 忘记密码验证码
@@ -208,7 +261,8 @@ const DB = (() => {
     if (!email) return { ok: false, msg: '请先填写邮箱' };
     if (!users.findByEmail(email)) return { ok: false, msg: '该邮箱未注册' };
     const code = setCode(email, 'reset');
-    return { ok: true, code, msg: '验证码已生成（页面显示）' };
+    const viaMail = mailCode(email, code);
+    return { ok: true, code, msg: viaMail ? '验证码已发送至邮箱，请查收' : '验证码已生成（页面显示）' };
   }
 
   // 注册
@@ -237,6 +291,9 @@ const DB = (() => {
     if (!u) return { ok: false, msg: '账号不存在' };
     if (u.banned) return { ok: false, msg: '账号已封禁：' + (u.banReason || '无') };
     if (!verifyMorse(password, u.password)) return { ok: false, msg: '密码错误' };
+    // 透明升级：存量旧格式密文在登录成功后原地改写为新格式
+    const upgraded = reencodeMorse(password, u.password);
+    if (upgraded !== u.password) users.update(u.id, { password: upgraded });
     setSession(u);
     return { ok: true, user: { id: u.id, username: u.username, email: u.email, role: u.role } };
   }
@@ -294,7 +351,8 @@ const DB = (() => {
     if (!u) return { ok: false, msg: '该邮箱不存在' };
     if (u.role !== 'admin') return { ok: false, msg: '该账号非管理员' };
     const code = setCode(email, 'admin');
-    return { ok: true, code, msg: '验证码已生成（页面显示）' };
+    const viaMail = mailCode(email, code);
+    return { ok: true, code, msg: viaMail ? '验证码已发送至邮箱，请查收' : '验证码已生成（页面显示）' };
   }
 
   // 管理员三重验证登录
@@ -311,6 +369,13 @@ const DB = (() => {
     if (!c || c.code !== code) return { ok: false, msg: '验证码错误或已过期' };
     if (!verifyMorse(passwordA, u.adminPasswordA)) return { ok: false, msg: '密码A错误' };
     if (!verifyMorse(passwordB, u.adminPasswordB)) return { ok: false, msg: '密码B错误' };
+    // 透明升级：存量旧格式密文在登录成功后原地改写为新格式
+    const upA = reencodeMorse(passwordA, u.adminPasswordA);
+    const upB = reencodeMorse(passwordB, u.adminPasswordB);
+    const patch = {};
+    if (upA !== u.adminPasswordA) patch.adminPasswordA = upA;
+    if (upB !== u.adminPasswordB) patch.adminPasswordB = upB;
+    if (Object.keys(patch).length) users.update(u.id, patch);
     if (u.adminPassphrase !== passphrase) return { ok: false, msg: '口令错误' };
     clearCode(email);
     setSession(u);
@@ -474,7 +539,8 @@ const DB = (() => {
       return { ok: false, msg: '邮箱不匹配超管邮箱' };
     }
     const code = setCode(email, 'super');
-    return { ok: true, code, msg: '验证码已生成（页面显示）' };
+    const viaMail = mailCode(email, code);
+    return { ok: true, code, msg: viaMail ? '验证码已发送至邮箱，请查收' : '验证码已生成（页面显示）' };
   }
 
   // 超管四重验证：用户名 + 密码A + 密码B + 邮箱验证码
@@ -486,6 +552,13 @@ const DB = (() => {
     if (username !== s.superAdminUsername) return { ok: false, msg: '用户名错误' };
     if (!verifyMorse(passwordA, s.superAdminPasswordA)) return { ok: false, msg: '密码A错误' };
     if (!verifyMorse(passwordB, s.superAdminPasswordB)) return { ok: false, msg: '密码B错误' };
+    // 透明升级：存量旧格式密文在登录成功后原地改写为新格式
+    const upA = reencodeMorse(passwordA, s.superAdminPasswordA);
+    const upB = reencodeMorse(passwordB, s.superAdminPasswordB);
+    const patch = {};
+    if (upA !== s.superAdminPasswordA) patch.superAdminPasswordA = upA;
+    if (upB !== s.superAdminPasswordB) patch.superAdminPasswordB = upB;
+    if (Object.keys(patch).length) updateSettings(patch);
     if (email !== s.superAdminEmail && email !== s.superAdminEmailBackup) {
       return { ok: false, msg: '邮箱不匹配' };
     }
@@ -610,12 +683,128 @@ const DB = (() => {
     return { ok: true, msg: '密码A已修改' };
   }
 
+  // ===== 服务器同步层（共享后端）=====
+  // 仅同步这 5 个键；pgf_session 与 pgf_codes_* 绝不同步（保持浏览器本地）
+  // 注意：SYNC_KEYS / syncEnabled 必须在任何 write 调用之前完成声明（本段位于下方 init() 调用之前）。
+  const SYNC_KEYS = [K.users, K.apps, K.kicks, K.tours, K.settings];
+  let syncEnabled = false; // 是否已启用服务器同步
+  let lastRev = -1;        // 最近一次拉取到的服务器 rev
+  let pollingTimer = null; // 轮询定时器
+  // 仅在 http(s) 协议下才可能连到后端；直接用 file:// 打开时 fetch 会被浏览器拦截（ERR_BLOCKED_BY_CLIENT），
+  // 故此时直接禁用同步，静默退回纯本地模式
+  const canSync = (typeof location !== 'undefined') && (location.protocol === 'http:' || location.protocol === 'https:');
+
+  // 把服务器返回 data 中的已同步键写入本地 localStorage（覆盖本地缓存）
+  function applyServerData(data) {
+    if (!data || typeof data !== 'object') return;
+    SYNC_KEYS.forEach(k => {
+      if (Object.prototype.hasOwnProperty.call(data, k)) {
+        localStorage.setItem(k, JSON.stringify(data[k]));
+      }
+    });
+  }
+
+  // fire-and-forget 推送一次操作（不阻塞，错误静默忽略）
+  function pushOp(k, v) {
+    if (!canSync) return; // file:// 或非 http(s) 下不做推送
+    try {
+      fetch('/api/op', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: k, value: v }),
+      }).catch(() => { /* 忽略网络错误 */ });
+    } catch (e) { /* 忽略（如 fetch 不可用） */ }
+  }
+
+  // 手动触发一次拉取
+  function pull() {
+    if (!canSync) return Promise.resolve();
+    try {
+      return fetch('/api/state')
+        .then(r => r.json())
+        .then(state => {
+          if (state && state.ok) {
+            applyServerData(state.data);
+            lastRev = state.rev;
+            syncEnabled = true;
+          }
+          return state;
+        })
+        .catch(() => { /* 忽略 */ });
+    } catch (e) { return Promise.resolve(); }
+  }
+
+  // 轮询：rev 变化则写入本地并广播 db:changed
+  function pollOnce() {
+    if (!canSync) return;
+    try {
+      fetch('/api/state')
+        .then(r => r.json())
+        .then(state => {
+          if (state && state.ok && state.rev !== lastRev) {
+            applyServerData(state.data);
+            lastRev = state.rev;
+            window.dispatchEvent(new Event('db:changed'));
+          }
+        })
+        .catch(() => { /* 忽略网络错误 */ });
+    } catch (e) { /* 忽略 */ }
+  }
+
+  // 初始化流程：先拉取服务器数据；失败则静默降级为纯本地模式
+  const ready = (function () {
+    if (!canSync) { syncEnabled = false; return Promise.resolve(); } // file:// 下无后端，直接纯本地
+    try {
+      return fetch('/api/state')
+        .then(r => r.json())
+        .then(state => {
+          if (state && state.ok) {
+            applyServerData(state.data);
+            lastRev = state.rev;
+            syncEnabled = true;
+            if (!pollingTimer) pollingTimer = setInterval(pollOnce, 3000);
+          }
+        })
+        .catch(() => { syncEnabled = false; });
+    } catch (e) {
+      syncEnabled = false;
+      return Promise.resolve();
+    }
+  })();
+
+  // 同一浏览器多标签页：storage 事件触发即时刷新
+  window.addEventListener('storage', e => {
+    if (SYNC_KEYS.indexOf(e.key) >= 0) window.dispatchEvent(new Event('db:changed'));
+  });
+
+  // 通过后端请求发送验证码邮件（未启用同步 / 非 http(s) 时返回 null）
+  function sendMail(email, code) {
+    if (!canSync || !syncEnabled) return Promise.resolve(null);
+    try {
+      return fetch('/api/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code }),
+      })
+        .then(r => r.json())
+        .catch(() => null);
+    } catch (e) { return Promise.resolve(null); }
+  }
+
+  const sync = {
+    ready,
+    pull,
+    isEnabled: () => syncEnabled,
+    sendMail,
+  };
+
   // 初始化公开
   init();
 
   return {
     init,
     users,
+    sync,
     getSession, clearSession,
     maskEmail,
     // 用户 API
