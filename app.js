@@ -706,6 +706,12 @@ const DB = (() => {
   // 故此时直接禁用同步，静默退回纯本地模式
   const canSync = (typeof location !== 'undefined') && (location.protocol === 'http:' || location.protocol === 'https:');
 
+  // ===== 后端 API 地址 =====
+  // 本地开发（node server.js + 访问 localhost:3000）：留空字符串，走相对路径
+  // 静态托管（GitHub Pages 等）+ 云端后端：填云端地址，如 'https://moss-backend.onrender.com'
+  // 注意末尾不要加 /
+  const API_BASE = '';
+
   // 按 id 合并两个数组（与后端 mergeArrays 对齐）：
   // 新值覆盖同 id 旧记录；旧值独有记录保留；_deleted:true 的条目从结果中删除。
   // _deleted 标记最后处理，确保同一轮合并中删除优先于新增。
@@ -752,7 +758,7 @@ const DB = (() => {
   function pushOp(k, v) {
     if (!canSync) return; // file:// 或非 http(s) 下不做推送
     try {
-      fetch('/api/op', {
+      fetch(API_BASE + '/api/op', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: k, value: v }),
@@ -764,7 +770,7 @@ const DB = (() => {
   function pull() {
     if (!canSync) return Promise.resolve();
     try {
-      return fetch('/api/state')
+      return fetch(API_BASE + '/api/state')
         .then(r => r.json())
         .then(state => {
           if (state && state.ok) {
@@ -782,7 +788,7 @@ const DB = (() => {
   function pollOnce() {
     if (!canSync) return;
     try {
-      fetch('/api/state')
+      fetch(API_BASE + '/api/state')
         .then(r => r.json())
         .then(state => {
           if (state && state.ok && state.rev !== lastRev) {
@@ -799,7 +805,7 @@ const DB = (() => {
   const ready = (function () {
     if (!canSync) { syncEnabled = false; return Promise.resolve(); } // file:// 下无后端，直接纯本地
     try {
-      return fetch('/api/state')
+      return fetch(API_BASE + '/api/state')
         .then(r => r.json())
         .then(state => {
           if (state && state.ok) {
@@ -825,7 +831,7 @@ const DB = (() => {
   function sendMail(email, code) {
     if (!canSync || !syncEnabled) return Promise.resolve(null);
     try {
-      return fetch('/api/send-code', {
+      return fetch(API_BASE + '/api/send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code }),

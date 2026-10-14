@@ -1,0 +1,13 @@
+{
+  "name": "moss-platform",
+  "version": "1.0.0",
+  "description": "MOSS 博弈平台 - 静态站 + 数据同步 + 163 SMTP 邮件服务",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
